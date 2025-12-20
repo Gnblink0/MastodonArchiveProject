@@ -9,7 +9,8 @@ import { StatsPage } from './pages/StatsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { InteractionsPage } from './pages/InteractionsPage'
 import { db } from './lib/db'
-import { Home, User, Trash2, BarChart3, X, Star, Bookmark } from 'lucide-react'
+import { Home, User, Trash2, BarChart3, X, Star, Bookmark, LogIn, LogOut, Cloud } from 'lucide-react'
+import { useGoogleLogin } from '@react-oauth/google'
 
 function App() {
   const [hasData, setHasData] = useState(false)
@@ -18,6 +19,35 @@ function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+
+  // Google OAuth states
+  const [googleUser, setGoogleUser] = useState<any>(null)
+  const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null)
+
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      console.log('Google Login Success:', tokenResponse)
+      setGoogleAccessToken(tokenResponse.access_token)
+      
+      // Fetch user profile
+      try {
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        })
+        const userInfo = await res.json()
+        setGoogleUser(userInfo)
+      } catch (err) {
+        console.error('Failed to fetch Google user info', err)
+      }
+    },
+    onError: error => console.error('Google Login Failed:', error),
+    scope: 'https://www.googleapis.com/auth/drive.file'
+  });
+
+  const handleLogout = () => {
+    setGoogleUser(null)
+    setGoogleAccessToken(null)
+  }
 
   useEffect(() => {
     // 检查是否已有数据
@@ -49,7 +79,12 @@ function App() {
             <h1 className="text-3xl font-bold text-white mb-2">Mastodon Archive Viewer</h1>
             <p className="text-mastodon-text-secondary">Upload your archive to browse your history</p>
          </header>
-         <UploadZone onUploadComplete={handleUploadComplete} />
+         <UploadZone 
+            onUploadComplete={handleUploadComplete} 
+            googleUser={googleUser}
+            googleLogin={googleLogin}
+            googleAccessToken={googleAccessToken}
+         />
       </div>
     )
   }
@@ -115,6 +150,36 @@ function App() {
       </nav>
 
       <div className="px-6 pb-6 mt-auto sticky bottom-0 bg-mastodon-bg z-10 border-t border-mastodon-border">
+        {googleAccessToken ? (
+          <>
+            <div className="flex items-center justify-between py-2 text-mastodon-text-secondary text-sm">
+              <span>Logged in as {googleUser?.name || 'User'}</span>
+              <button
+                onClick={handleLogout}
+                className="text-red-400 hover:text-red-300 flex items-center gap-1.5"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
+            </div>
+            <button
+              onClick={() => console.log('Upload to Drive')} // TODO: Implement upload
+              className="flex items-center justify-center gap-2 w-full py-2 mb-2 text-mastodon-primary hover:text-mastodon-primary/80 hover:bg-white/5 rounded-lg text-sm transition-colors cursor-pointer"
+            >
+              <Cloud className="w-4 h-4" />
+              <span>Sync to Drive</span>
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => googleLogin()}
+            className="flex items-center justify-center gap-2 w-full py-2 mb-2 text-mastodon-primary hover:text-mastodon-primary/80 hover:bg-white/5 rounded-lg text-sm transition-colors cursor-pointer"
+          >
+            <LogIn className="w-4 h-4" />
+            <span>Login with Google</span>
+          </button>
+        )}
+
         <button
            onClick={async () => {
              if (confirm('Are you sure you want to clear all data? This cannot be undone.')) {

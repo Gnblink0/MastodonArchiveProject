@@ -14,8 +14,8 @@ import {
   CartesianGrid,
   Brush
 } from 'recharts'
-import { ChevronDown, ChevronUp, BarChart3, TrendingUp, Calendar } from 'lucide-react'
-import { format, eachDayOfInterval, startOfYear, endOfYear, getYear, isSameDay, eachWeekOfInterval, getDay } from 'date-fns'
+import { BarChart3, TrendingUp, Calendar } from 'lucide-react'
+import { format, startOfYear, endOfYear, getYear, eachWeekOfInterval } from 'date-fns'
 
 export function StatsPage() {
   const [chartType, setChartType] = useState<'line' | 'bar'>('line')
@@ -358,9 +358,6 @@ export function StatsPage() {
                                 if (count > 5) bgColor = '#26a641'
                                 if (count > 10) bgColor = '#39d353'
 
-                                // Detailed Tooltip Title
-                                const tooltipTitle = `${dayKey}\nTotal: ${count}\nOriginal: ${activity.original}\nReplies: ${activity.reply}\nBoosts: ${activity.boost}`
-
                                 return (
                                    <div 
                                       key={dayKey}
@@ -372,7 +369,6 @@ export function StatsPage() {
                                       }}
                                       className="w-3 h-3 md:w-3.5 md:h-3.5 rounded-sm cursor-pointer transition-opacity hover:opacity-80 relative"
                                       style={{ backgroundColor: bgColor }}
-                                      title={`${dayKey}\nTotal: ${count}\nOriginal: ${activity.original}\nReplies: ${activity.reply}\nBoosts: ${activity.boost}`}
                                    />
                                 )
                              })}
