@@ -7,8 +7,9 @@ import { DebugDashboard } from './components/Debug/DebugDashboard'
 import { MainLayout } from './components/Layout/MainLayout'
 import { StatsPage } from './pages/StatsPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { InteractionsPage } from './pages/InteractionsPage'
 import { db } from './lib/db'
-import { Home, User, Trash2, BarChart3, Menu, X } from 'lucide-react'
+import { Home, User, Trash2, BarChart3, Menu, X, Star, Bookmark } from 'lucide-react'
 
 function App() {
   const [hasData, setHasData] = useState(false)
@@ -95,21 +96,37 @@ function App() {
          </button>
 
 
+         <button 
+            onClick={() => { navigate('/favourites'); setMobileMenuOpen(false) }}
+            className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
+         >
+            <Star className="w-6 h-6" />
+            <span className="text-lg">Favourites</span>
+         </button>
+
+         <button 
+            onClick={() => { navigate('/bookmarks'); setMobileMenuOpen(false) }}
+            className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
+         >
+            <Bookmark className="w-6 h-6" />
+            <span className="text-lg">Bookmarks</span>
+         </button>
+
       </nav>
 
-      <div className="px-6 pb-6">
+      <div className="px-6 pb-6 mt-auto sticky bottom-0 bg-mastodon-bg z-10 border-t border-mastodon-border">
         <button
            onClick={async () => {
-             if (confirm('Are you sure you want to clear all data?')) {
+             if (confirm('Are you sure you want to clear all data? This cannot be undone.')) {
                await db.clearAll()
                setHasData(false)
                navigate('/')
                setMobileMenuOpen(false)
              }
            }}
-           className="flex items-center justify-center gap-2 w-full py-3 text-red-500 hover:bg-red-500/10 rounded-full font-medium transition-colors cursor-pointer"
+           className="flex items-center justify-center gap-2 w-full py-2 text-mastodon-text-tertiary hover:text-red-400 hover:bg-white/5 rounded-lg text-sm transition-colors cursor-pointer"
         >
-          <Trash2 className="w-5 h-5" />
+          <Trash2 className="w-4 h-4" />
           <span>Clear Data</span>
         </button>
       </div>
@@ -140,8 +157,9 @@ function App() {
 
       <MainLayout
         leftSidebar={leftSidebarContent}
+        onMobileMenuToggle={location.pathname !== '/' ? () => setMobileMenuOpen(true) : undefined}
         rightSidebar={
-           ['/stats', '/profile'].includes(location.pathname) ? undefined : (
+           ['/stats', '/profile', '/favourites', '/bookmarks'].includes(location.pathname) ? undefined : (
              selectedPostId ? (
                 <ThreadView
                   postId={selectedPostId}
@@ -162,6 +180,8 @@ function App() {
            <Route path="/post/:id" element={<ThreadView />} />
            <Route path="/stats" element={<StatsPage />} />
            <Route path="/profile" element={<ProfilePage />} />
+           <Route path="/favourites" element={<InteractionsPage type="likes" />} />
+           <Route path="/bookmarks" element={<InteractionsPage type="bookmarks" />} />
            <Route path="/debug" element={<DebugDashboard />} />
         </Routes>
       </MainLayout>

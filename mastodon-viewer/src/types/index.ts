@@ -53,7 +53,7 @@ export interface Like {
   activityId: string
   likedPostId: string
   targetUrl?: string 
-  likedAt: Date
+  likedAt?: Date
   postPreview?: string
 }
 
@@ -62,7 +62,7 @@ export interface Bookmark {
   activityId: string
   bookmarkedPostId: string
   targetUrl?: string
-  bookmarkedAt: Date
+  bookmarkedAt?: Date
   postPreview?: string
 }
 

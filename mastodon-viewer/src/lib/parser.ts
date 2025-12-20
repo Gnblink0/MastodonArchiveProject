@@ -292,15 +292,21 @@ export class ArchiveParser {
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
+      const type = item.type ? item.type.toLowerCase() : ''
 
-      if (item.type === 'Create' && typeof item.object === 'object') {
+      if (type === 'create' && typeof item.object === 'object') {
         const obj = item.object as ActivityPubNote
 
         // 确保有有效的 ID
         if (!obj.id) {
-          console.warn(`跳过没有 ID 的帖子 (索引 ${i})`)
-          skippedCount++
-          continue
+          // Fallback: use url if id is missing or not a string
+          if (obj.url) {
+             obj.id = obj.url
+          } else {
+             console.warn(`跳过没有 ID 的帖子 (索引 ${i})`)
+             skippedCount++
+             continue
+          }
         }
 
         // Helper to extract ID from URL handling trailing slashes
@@ -364,19 +370,29 @@ export class ArchiveParser {
           summary: obj.summary,
           originalUrl: obj.id
         })
-      } else if (item.type === 'Announce') {
-        // 确保有有效的 ID
-        if (!item.id) {
-          console.warn(`跳过没有 ID 的转发 (索引 ${i})`)
-          skippedCount++
-          continue
+      } else if (type === 'announce') {
+        // Boosts often have the same ID structure or might be duplicated in some exports
+        // We append the index 'i' to ensure uniqueness in our local DB if the ID is generic or reused
+        const rawId = item.id ? (item.id.split('/').pop() || item.id) : `boost-${i}`
+        const postId = `${rawId}-${i}`
+
+        // Extract boosted ID/URL safely handling both string and object forms of 'object'
+        let boostedPostId: string | undefined
+        let originalUrl: string | undefined
+
+        if (typeof item.object === 'string') {
+          boostedPostId = item.object
+          originalUrl = item.object
+        } else if (item.object && typeof item.object === 'object') {
+           boostedPostId = item.object.id || item.object.url
+           originalUrl = item.object.url || item.object.id
         }
 
-        const postId = item.id.split('/').pop() || item.id
+        console.log(`Found Boost (Index ${i}):`, { postId, boostedPostId })
 
         posts.push({
           id: postId,
-          activityId: item.id,
+          activityId: item.id || '',
           type: 'boost',
           content: '',
           contentText: '',
@@ -387,8 +403,8 @@ export class ArchiveParser {
           mediaIds: [],
           sensitive: false,
           visibility: 'public', // Boosts are usually public
-          boostedPostId: typeof item.object === 'string' ? item.object : undefined,
-          originalUrl: item.id
+          boostedPostId,
+          originalUrl: originalUrl || item.id
         })
       }
 
@@ -408,51 +424,54 @@ export class ArchiveParser {
 
   private async parseMedia(container: ArchiveContainer): Promise<Media[]> {
     const mediaFiles = container.file(/^media_attachments\//)
-
     this.reportProgress('解析媒体文件', 0, mediaFiles.length)
 
     const media: Media[] = []
+    const BATCH_SIZE = 20 // Process 20 files concurrently
 
-    for (let i = 0; i < mediaFiles.length; i++) {
-      const file = mediaFiles[i]
+    for (let i = 0; i < mediaFiles.length; i += BATCH_SIZE) {
+      const batch = mediaFiles.slice(i, i + BATCH_SIZE)
+      
+      const batchResults = await Promise.all(
+        batch.map(async (file) => {
+          // Skip directories
+          if (file.dir) return null
 
-      // 跳过目录
-      if (file.dir) continue
+          const filename = file.name.split('/').pop() || ''
+          // Detect MIME type
+          const mimeType = this.getMimeTypeFromFilename(filename)
 
-      const filename = file.name.split('/').pop() || ''
+          try {
+             // Get blob data
+             const arrayBuffer = await file.async('arraybuffer')
+             const blob = new Blob([arrayBuffer], { type: mimeType })
+             
+             // Use filename as ID
+             const id = filename
 
-      // Detect MIME type from filename extension
-      const mimeType = this.getMimeTypeFromFilename(filename)
+             return {
+                id,
+                filename,
+                type: this.detectMediaType(mimeType),
+                blob,
+                url: URL.createObjectURL(blob)
+             }
+          } catch (e) {
+             console.error(`Failed to parse media file ${filename}`, e)
+             return null
+          }
+        })
+      )
 
-      // Get blob data and create properly typed blob
-      const arrayBuffer = await file.async('arraybuffer')
-      const blob = new Blob([arrayBuffer], { type: mimeType })
+      // Filter out nulls (directories or failed files) and add to results
+      const validResults = batchResults.filter((m): m is Media => m !== null)
+      media.push(...validResults)
 
-      console.log('Parsing media file:', {
-        filename,
-        detectedMimeType: mimeType,
-        blobType: blob.type,
-        blobSize: blob.size
-      })
-
-      // Use filename as ID to match parsePosts logic
-      const id = filename
-
-      media.push({
-        id,
-        filename,
-        type: this.detectMediaType(mimeType),
-        blob,
-        url: URL.createObjectURL(blob)
-      })
-
-      if ((i + 1) % 10 === 0) {
-        this.reportProgress('解析媒体文件', i + 1, mediaFiles.length)
-      }
+      // Report progress based on actual processed count
+      this.reportProgress('解析媒体文件', Math.min(i + BATCH_SIZE, mediaFiles.length), mediaFiles.length)
     }
 
     this.reportProgress('解析媒体文件', mediaFiles.length, mediaFiles.length)
-
     return media
   }
 
@@ -477,13 +496,28 @@ export class ArchiveParser {
     const json = JSON.parse(jsonStr)
     const items = json.orderedItems || []
 
-    const likes: Like[] = items.map((item: any) => ({
-      id: item.id,
-      activityId: item.id,
-      likedPostId: item.object,
-      targetUrl: item.object,
-      likedAt: new Date(item.published || Date.now())
-    }))
+    const likes: Like[] = items.map((item: any, index: number) => {
+      // Handle case where item is just a string URL (common in some exports)
+      if (typeof item === 'string') {
+        return {
+          id: `like-${index}-${Date.now()}`, // Generate a synthetic ID
+          activityId: `like-${index}`,
+          likedPostId: item,
+          targetUrl: item,
+          likedAt: undefined // No date available
+        }
+      }
+
+      // Handle standard ActivityPub object format
+      const targetUrl = typeof item.object === 'string' ? item.object : item.object?.id || item.object?.url
+      return {
+        id: item.id || `like-${index}-${Date.now()}`,
+        activityId: item.id || `like-${index}`,
+        likedPostId: targetUrl,
+        targetUrl: targetUrl,
+        likedAt: new Date(item.published || Date.now())
+      }
+    })
 
     this.reportProgress('解析点赞记录', 1, 1)
 
@@ -511,13 +545,28 @@ export class ArchiveParser {
     const json = JSON.parse(jsonStr)
     const items = json.orderedItems || []
 
-    const bookmarks: Bookmark[] = items.map((item: any) => ({
-      id: item.id,
-      activityId: item.id,
-      bookmarkedPostId: item.object,
-      targetUrl: item.object,
-      bookmarkedAt: new Date(item.published || Date.now())
-    }))
+    const bookmarks: Bookmark[] = items.map((item: any, index: number) => {
+      // Handle case where item is just a string URL
+      if (typeof item === 'string') {
+        return {
+          id: `bookmark-${index}-${Date.now()}`, // Generate synthetic ID
+          activityId: `bookmark-${index}`,
+          bookmarkedPostId: item,
+          targetUrl: item,
+          bookmarkedAt: undefined // No date available
+        }
+      }
+
+      // Handle standard ActivityPub object format
+      const targetUrl = typeof item.object === 'string' ? item.object : item.object?.id || item.object?.url
+      return {
+        id: item.id || `bookmark-${index}-${Date.now()}`,
+        activityId: item.id || `bookmark-${index}`,
+        bookmarkedPostId: targetUrl,
+        targetUrl: targetUrl,
+        bookmarkedAt: new Date(item.published || Date.now())
+      }
+    })
 
     this.reportProgress('解析书签记录', 1, 1)
 

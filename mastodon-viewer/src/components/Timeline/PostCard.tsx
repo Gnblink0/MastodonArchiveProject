@@ -2,9 +2,12 @@ import { ExternalLink, Reply } from 'lucide-react'
 import type { Post } from '../../types'
 import { useMedia, useActor } from '../../hooks/usePosts'
 import { useEffect, useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../../lib/db'
 import Lightbox from 'yet-another-react-lightbox'
 import Zoom from 'yet-another-react-lightbox/plugins/zoom'
 import 'yet-another-react-lightbox/styles.css'
+import { EmbeddedPost } from './EmbeddedPost'
 
 interface PostCardProps {
   post: Post
@@ -13,7 +16,26 @@ interface PostCardProps {
 }
 
 export function PostCard({ post, onClick, highlight }: PostCardProps) {
-  const media = useMedia(post.mediaIds)
+  // Logic to fetch boosted post if it's a boost
+  const boostedPost = useLiveQuery(
+    async () => {
+      if (post.type !== 'boost' || !post.boostedPostId) return null
+      // Try to find the local post if it exists
+      // The boostedPostId might be a URL or an ID. Our DB stores IDs mainly.
+      // Parser stored extraction of ID from URL in `id` field.
+      // So detailed logic: try to find a post where id matches the extracted ID from boostedPostId
+      const idPart = post.boostedPostId.split('/').pop()
+      if (!idPart) return null
+      return db.posts.get(idPart)
+    },
+    [post.id, post.type, post.boostedPostId]
+  )
+
+  const displayPost = boostedPost || post
+  // If it's a boost but we found the original, use the original's media/content
+  // BUT we keep the "Boosted by" header from the wrapper post
+  
+  const media = useMedia(displayPost.mediaIds)
   const actor = useActor()
   const [isExpanded, setIsExpanded] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -139,7 +161,7 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
                  <time dateTime={post.publishedAt.toISOString()} className="hover:underline cursor-pointer">
                     {formatDate(post.publishedAt)}
                  </time>
-                 {post.sensitive && (
+                  {displayPost.sensitive && (
                   <span className="ml-2 px-1.5 py-0.5 bg-mastodon-bg border border-mastodon-border text-xs rounded text-mastodon-warning">
                     CW
                   </span>
@@ -149,7 +171,7 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
 
 
           {/* CW 警告 */}
-          {post.summary && (
+          {displayPost.summary && (
             <div className="mb-3 p-3 bg-mastodon-bg border border-mastodon-border rounded flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-white">{post.summary}</span>
@@ -166,16 +188,23 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
             </div>
           )}
 
-          {/* 帖子内容 */}
-          {post.content && (!post.summary || isExpanded) && (
+          {/* 帖子内容 - Use displayPost instead of post */}
+          {displayPost.content && (!displayPost.summary || isExpanded) && (
             <div
               className="prose prose-invert prose-sm max-w-none mb-3 text-mastodon-text-primary leading-snug break-words overflow-hidden"
-              dangerouslySetInnerHTML={{ __html: getHighlightedContent(post.content, highlight) }}
+              dangerouslySetInnerHTML={{ __html: getHighlightedContent(displayPost.content, highlight) }}
             />
           )}
 
+          {/* Fallback for external boosts without content */}
+          {post.type === 'boost' && !boostedPost && post.boostedPostId && (
+              <div className="mb-3">
+                 <EmbeddedPost url={post.boostedPostId} />
+              </div>
+          )}
+
           {/* 媒体附件 */}
-          {media && media.length > 0 && (!post.summary || isExpanded) && (
+          {media && media.length > 0 && (!displayPost.summary || isExpanded) && (
             <div className={`grid gap-2 mb-3 mt-3 rounded-lg overflow-hidden ${
               media.length === 1 ? 'grid-cols-1' :
               media.length === 2 ? 'grid-cols-2' :
@@ -206,9 +235,9 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
           )}
 
           {/* 标签 */}
-          {post.tags.length > 0 && (
+          {displayPost.tags.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3">
-              {post.tags.map((tag, index) => (
+              {displayPost.tags.map((tag, index) => (
                 <span
                   key={index}
                   className="text-mastodon-text-link hover:underline text-sm"
@@ -221,15 +250,24 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
 
           {/* Footer Actions */}
           <div className="flex items-center justify-between mt-4 text-xs text-mastodon-text-secondary">
-            {post.inReplyTo ? (
-               <div className="flex items-center gap-1.5">
-                  <Reply className="w-3.5 h-3.5" />
-                  <span>In reply to a post</span>
-               </div>
-            ) : <div />}
+             <div className="flex items-center gap-4">
+                {displayPost.inReplyTo && (
+                   <div className="flex items-center gap-1.5">
+                      <Reply className="w-3.5 h-3.5" />
+                      <span>In reply to a post</span>
+                   </div>
+                )}
+                
+                {post.type === 'boost' && !boostedPost && (
+                   <div className="flex items-center gap-1.5 text-mastodon-text-secondary italic">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>External Boost</span>
+                   </div>
+                )}
+             </div>
 
              <a 
-               href={post.activityId} 
+               href={displayPost.activityId || displayPost.originalUrl} 
                target="_blank" 
                rel="noopener noreferrer"
                onClick={(e) => e.stopPropagation()}

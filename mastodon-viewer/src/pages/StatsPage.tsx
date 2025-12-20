@@ -60,21 +60,37 @@ export function StatsPage() {
         dailyActivity[dateStr].boost++
         
         // Extract boosted user (heuristics from originalUrl or content if available)
-        // Since we don't have explicit boostedAccount in schema yet, we might rely on parsing
-        // But for now, let's skip extracting username from boost as it requires more complex parsing not fully in schema
-        // Or if we assume originalUrl contains the user?
-        if (post.originalUrl) {
-           // Try to extract username from URL (e.g., https://instance.com/@user/123 or https://instance.com/users/user/statuses/123)
-           // This is rough estimation
+        if (post.boostedPostId) {
+           // Use boostedPostId (original status URL) to find the interactee
+           // Formats:
+           // - https://instance.com/@user/id
+           // - https://instance.com/users/user/statuses/id
+           const url = post.boostedPostId
            try {
-             const urlObj = new URL(post.originalUrl)
-             const pathParts = urlObj.pathname.split('/')
-             // find part starting with @ or 'users'
-             const userPart = pathParts.find(p => p.startsWith('@')) || pathParts[pathParts.indexOf('users') + 1]
-             if (userPart) {
-               boostInteractions[userPart] = (boostInteractions[userPart] || 0) + 1
+             // Basic URL validation
+             if (!url.startsWith('http')) {
+               // If it's not a URL, it might be an ID or handle? Skip for now but log
+               console.warn('[Stats] Invalid boost URL:', url)
+             } else {
+                 const urlObj = new URL(url)
+                 const path = urlObj.pathname
+                 
+                 // Match @username
+                 const atMatch = path.match(/\/(@[\w\-\.]+)/)
+                 if (atMatch) {
+                    boostInteractions[atMatch[1]] = (boostInteractions[atMatch[1]] || 0) + 1
+                 } else {
+                     // Match /users/username
+                     const usersMatch = path.match(/\/users\/([\w\-\.]+)/)
+                     if (usersMatch) {
+                        const username = '@' + usersMatch[1] // Normalize to @username
+                        boostInteractions[username] = (boostInteractions[username] || 0) + 1
+                     }
+                 }
              }
-           } catch (e) {}
+           } catch (e) {
+             console.error('[Stats] Error parsing boost URL:', url, e)
+           }
         }
 
       } else {
@@ -125,10 +141,19 @@ export function StatsPage() {
        if (like.targetUrl) {
          try {
            const urlObj = new URL(like.targetUrl)
-           // Attempt to extract username
-             const pathParts = urlObj.pathname.split('/')
-             const userPart = pathParts.find(p => p.startsWith('@')) || pathParts[pathParts.indexOf('users') + 1]
-             if (userPart) likeInteractions[userPart] = (likeInteractions[userPart] || 0) + 1
+           const path = urlObj.pathname
+             // Match @username
+             const atMatch = path.match(/\/(@[\w\-\.]+)/)
+             if (atMatch) {
+                likeInteractions[atMatch[1]] = (likeInteractions[atMatch[1]] || 0) + 1
+             } else {
+                 // Match /users/username
+                 const usersMatch = path.match(/\/users\/([\w\-\.]+)/)
+                 if (usersMatch) {
+                    const username = '@' + usersMatch[1]
+                    likeInteractions[username] = (likeInteractions[username] || 0) + 1
+                 }
+             }
          } catch(e) {}
        }
     })
@@ -138,10 +163,19 @@ export function StatsPage() {
        if (bm.targetUrl) {
          try {
            const urlObj = new URL(bm.targetUrl)
-           // Attempt to extract username
-             const pathParts = urlObj.pathname.split('/')
-             const userPart = pathParts.find(p => p.startsWith('@')) || pathParts[pathParts.indexOf('users') + 1]
-             if (userPart) bookmarkInteractions[userPart] = (bookmarkInteractions[userPart] || 0) + 1
+           const path = urlObj.pathname
+             // Match @username
+             const atMatch = path.match(/\/(@[\w\-\.]+)/)
+             if (atMatch) {
+                bookmarkInteractions[atMatch[1]] = (bookmarkInteractions[atMatch[1]] || 0) + 1
+             } else {
+                 // Match /users/username
+                 const usersMatch = path.match(/\/users\/([\w\-\.]+)/)
+                 if (usersMatch) {
+                    const username = '@' + usersMatch[1]
+                    bookmarkInteractions[username] = (bookmarkInteractions[username] || 0) + 1
+                 }
+             }
          } catch(e) {}
        }
     })
