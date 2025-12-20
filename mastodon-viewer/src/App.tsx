@@ -6,7 +6,7 @@ import { ThreadView } from './components/Thread/ThreadView'
 import { DebugDashboard } from './components/Debug/DebugDashboard'
 import { MainLayout } from './components/Layout/MainLayout'
 import { db } from './lib/db'
-import { Home, Search, User, Trash2, BarChart3 } from 'lucide-react'
+import { Home, User, Trash2, BarChart3 } from 'lucide-react'
 
 function App() {
   const [hasData, setHasData] = useState(false)

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { db } from '../../lib/db'
-import { MainLayout } from '../Layout/MainLayout'
+// import { MainLayout } from '../Layout/MainLayout'
 import { Loader2 } from 'lucide-react'
 
 export function DebugDashboard() {

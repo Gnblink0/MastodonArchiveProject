@@ -19,7 +19,7 @@ export function Timeline({ onPostClick }: TimelineProps) {
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Post[]>([])
   const [allPosts, setAllPosts] = useState<Post[]>([])
-  const [isSearching, setIsSearching] = useState(false)
+  const [, setIsSearching] = useState(false)
 
   // Data fetching for normal timeline
   const postsCallback = usePosts(pageSize, (page - 1) * pageSize)
