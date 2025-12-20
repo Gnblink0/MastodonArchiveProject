@@ -1,0 +1,5 @@
+{
+  "installCommand": "npm install --prefix mastodon-viewer",
+  "buildCommand": "npm run build --prefix mastodon-viewer",
+  "outputDirectory": "mastodon-viewer/dist"
+}
