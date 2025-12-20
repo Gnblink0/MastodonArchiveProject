@@ -80,17 +80,17 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
   return (
     <article
        onClick={handleCardClick}
-       className="bg-mastodon-surface border-b border-mastodon-border p-6 hover:bg-opacity-80 transition-colors first:rounded-t-md last:rounded-b-md cursor-pointer"
+       className="bg-mastodon-surface border-b border-mastodon-border p-4 hover:bg-opacity-80 transition-colors first:rounded-t-md last:rounded-b-md cursor-pointer"
     >
       {/* 转发标识 */}
       {post.type === 'boost' && (
-        <div className="mb-4 text-sm text-mastodon-text-secondary flex items-center gap-2 pl-14 font-medium">
+        <div className="mb-2 text-sm text-mastodon-text-secondary flex items-center gap-2 pl-12">
           <span>🔄</span>
           <span>Boosted</span>
         </div>
       )}
 
-      <div className="flex gap-4">
+      <div className="flex gap-3">
         {/* 用户头像 */}
         {actor?.avatarUrl ? (
           <img
@@ -104,18 +104,18 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
 
         <div className="flex-1 min-w-0">
            {/* Header: Name and Time */}
-           <div className="flex justify-between items-start mb-3">
-              <div className="flex flex-col gap-0.5">
+           <div className="flex justify-between items-start mb-2">
+              <div className="flex flex-col">
                  <span className="font-bold text-white text-base leading-snug">{actor?.displayName || 'Me'}</span>
                  <span className="text-mastodon-text-secondary text-sm leading-snug">@{actor?.preferredUsername || 'me'}</span>
               </div>
 
-              <div className="flex items-center gap-2 text-mastodon-text-secondary text-sm whitespace-nowrap ml-4">
+              <div className="flex items-center gap-1 text-mastodon-text-secondary text-sm whitespace-nowrap ml-4">
                  <time dateTime={post.publishedAt.toISOString()} className="hover:underline cursor-pointer">
                     {formatDate(post.publishedAt)}
                  </time>
                  {post.sensitive && (
-                  <span className="px-2 py-1 bg-mastodon-warning/10 border border-mastodon-warning/30 text-xs rounded-md text-mastodon-warning font-semibold">
+                  <span className="ml-2 px-1.5 py-0.5 bg-mastodon-bg border border-mastodon-border text-xs rounded text-mastodon-warning">
                     CW
                   </span>
                  )}
@@ -125,7 +125,7 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
 
           {/* CW 警告 */}
           {post.summary && (
-            <div className="mb-4 p-4 bg-mastodon-bg border border-mastodon-border rounded flex items-center justify-between gap-3">
+            <div className="mb-3 p-3 bg-mastodon-bg border border-mastodon-border rounded flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-white">{post.summary}</span>
               </div>
@@ -134,7 +134,7 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
                   e.stopPropagation()
                   setIsExpanded(!isExpanded)
                 }}
-                className="px-3 py-1.5 text-xs text-mastodon-text-link uppercase font-bold hover:underline cursor-pointer"
+                className="text-xs text-mastodon-text-link uppercase font-bold hover:underline cursor-pointer"
               >
                 {isExpanded ? 'Show less' : 'Show more'}
               </button>
@@ -144,14 +144,14 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
           {/* 帖子内容 */}
           {post.content && (!post.summary || isExpanded) && (
             <div
-              className="prose prose-invert prose-sm max-w-none mb-4 text-mastodon-text-primary leading-relaxed"
+              className="prose prose-invert prose-sm max-w-none mb-3 text-mastodon-text-primary leading-snug"
               dangerouslySetInnerHTML={{ __html: getHighlightedContent(post.content, highlight) }}
             />
           )}
 
           {/* 媒体附件 */}
           {media && media.length > 0 && (!post.summary || isExpanded) && (
-            <div className={`grid gap-2 mb-4 mt-4 rounded-lg overflow-hidden ${
+            <div className={`grid gap-2 mb-3 mt-3 rounded-lg overflow-hidden ${
               media.length === 1 ? 'grid-cols-1' :
               media.length === 2 ? 'grid-cols-2' :
               media.length === 3 ? 'grid-cols-3' :
@@ -182,11 +182,11 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
 
           {/* 标签 */}
           {post.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex flex-wrap gap-2 mb-3">
               {post.tags.map((tag, index) => (
                 <span
                   key={index}
-                  className="text-mastodon-text-link hover:underline text-sm cursor-pointer"
+                  className="text-mastodon-text-link hover:underline text-sm"
                 >
                   #{tag}
                 </span>
@@ -195,7 +195,7 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
           )}
 
           {/* View Original Link */}
-          <div className="flex justify-end mt-5">
+          <div className="flex justify-end mt-4">
              <a 
                href={post.activityId} 
                target="_blank" 

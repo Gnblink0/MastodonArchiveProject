@@ -92,23 +92,23 @@ export function ThreadView({ postId: propPostId, onClose }: ThreadViewProps) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="h-full px-4 py-4">
       {!propPostId && (
-      <div className="mb-6">
+      <div className="mb-4">
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-2 px-4 py-2 text-mastodon-primary hover:bg-mastodon-surface transition-colors font-medium cursor-pointer rounded-lg"
+          className="flex items-center gap-2 px-3 py-2 text-mastodon-primary hover:bg-mastodon-surface transition-colors font-medium cursor-pointer rounded-lg"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-4 h-4" />
           <span>Back</span>
         </button>
       </div>
       )}
 
       {propPostId && onClose && (
-        <div className="mb-6 flex justify-between items-center border-b border-mastodon-border pb-4">
-            <h2 className="text-xl font-bold text-white">Thread</h2>
-            <button onClick={onClose} className="text-mastodon-text-secondary hover:text-white cursor-pointer text-2xl leading-none px-2">✕</button>
+        <div className="mb-4 flex justify-between items-center border-b border-mastodon-border pb-3">
+            <h2 className="text-lg font-bold text-white">Thread</h2>
+            <button onClick={onClose} className="text-mastodon-text-secondary hover:text-white cursor-pointer text-xl leading-none p-1">✕</button>
         </div>
       )}
 

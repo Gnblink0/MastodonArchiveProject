@@ -119,9 +119,9 @@ export function Timeline({ onPostClick }: TimelineProps) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="max-w-2xl mx-auto px-4 py-4">
       {/* Search Bar */}
-      <div className="mb-6">
+      <div className="mb-4">
         <div className={`
             flex items-center w-full bg-mastodon-surface
             border-2 transition-colors duration-200 rounded-full overflow-hidden
@@ -156,7 +156,7 @@ export function Timeline({ onPostClick }: TimelineProps) {
       </div>
 
       {/* Posts List */}
-      <div className="space-y-3">
+      <div>
         {displayedPosts.length === 0 ? (
           <div className="text-center py-12 text-mastodon-text-secondary">
             {query ? 'Try different keywords' : 'No posts in archive'}
@@ -184,25 +184,25 @@ export function Timeline({ onPostClick }: TimelineProps) {
                     forcePage={page - 1}
                     renderOnZeroPageCount={null}
 
-                    containerClassName="flex items-center justify-center gap-2 py-8 mt-6 border-t border-mastodon-border select-none"
+                    containerClassName="flex items-center justify-center gap-2 py-8 mt-4 border-t border-mastodon-border mx-4 select-none"
 
                     pageClassName="block"
-                    pageLinkClassName="flex items-center justify-center w-10 h-10 rounded-md bg-mastodon-surface text-mastodon-text-secondary hover:bg-mastodon-primary/20 hover:text-mastodon-primary transition-colors cursor-pointer text-sm font-medium"
+                    pageLinkClassName="flex items-center justify-center w-8 h-8 rounded-md bg-mastodon-surface text-mastodon-text-secondary hover:bg-mastodon-primary/20 hover:text-mastodon-primary transition-colors cursor-pointer text-sm"
 
                     activeClassName="block"
                     activeLinkClassName="!bg-mastodon-primary !text-white hover:bg-mastodon-primary hover:text-white"
 
-                    previousClassName="mr-auto"
+                    previousClassName="mr-auto sm:mr-2"
                     previousLinkClassName="px-4 py-2 rounded-lg bg-mastodon-surface text-white font-medium hover:bg-mastodon-border transition-colors cursor-pointer text-sm flex items-center"
 
-                    nextClassName="ml-auto"
+                    nextClassName="ml-auto sm:ml-2"
                     nextLinkClassName="px-4 py-2 rounded-lg bg-mastodon-surface text-white font-medium hover:bg-mastodon-border transition-colors cursor-pointer text-sm flex items-center"
 
                     disabledClassName="opacity-50 cursor-not-allowed"
                     disabledLinkClassName="cursor-not-allowed hover:bg-mastodon-surface"
 
-                    breakClassName="flex items-center justify-center w-10 h-10 text-mastodon-text-secondary"
-                    breakLinkClassName="block w-full h-full text-center leading-10"
+                    breakClassName="flex items-center justify-center w-8 h-8 text-mastodon-text-secondary"
+                    breakLinkClassName="block w-full h-full text-center leading-8"
                 />
             )}
           </>
