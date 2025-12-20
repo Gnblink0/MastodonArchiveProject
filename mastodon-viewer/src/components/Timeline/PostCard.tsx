@@ -1,0 +1,207 @@
+import { ExternalLink } from 'lucide-react'
+import type { Post } from '../../types'
+import { useMedia, useActor } from '../../hooks/usePosts'
+import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+
+interface PostCardProps {
+  post: Post
+  highlight?: string
+  onClick?: () => void
+}
+
+export function PostCard({ post, onClick, highlight }: PostCardProps) {
+  const media = useMedia(post.mediaIds)
+  const actor = useActor()
+  const navigate = useNavigate()
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  useEffect(() => {
+    if (media && media.length > 0) {
+      console.log('PostCard media debug:', post.id, media)
+    }
+  }, [media, post.id])
+
+  const formatDate = (date: Date) => {
+    return new Intl.DateTimeFormat('zh-CN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date)
+  }
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    // If clicking on a link or button, don't navigate
+    const target = e.target as HTMLElement
+    if (target.closest('a') || target.closest('button') || target.closest('video')) {
+      return
+    }
+    
+    if (onClick) {
+      onClick()
+    } else {
+      navigate(`/post/${post.id}`)
+    }
+  }
+
+  // Highlight helper
+  const getHighlightedContent = (content: string, term?: string) => {
+    if (!term || !term.trim()) return content
+    
+    try {
+      // Escape special regex characters
+      const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      // Match the term only if it's NOT inside an HTML tag
+      const regex = new RegExp(`(${escapedTerm})(?![^<]*>)`, 'gi')
+      
+      return content.replace(regex, '<mark class="bg-yellow-500/30 text-white rounded-sm px-0.5 font-bold">$1</mark>')
+    } catch (e) {
+      console.error('Highlight error', e)
+      return content
+    }
+  }
+
+  return (
+    <article 
+       onClick={handleCardClick}
+       className="bg-mastodon-surface border-b border-mastodon-border p-4 hover:bg-opacity-80 transition-colors first:rounded-t-md last:rounded-b-md cursor-pointer"
+    >
+      {/* 转发标识 */}
+      {post.type === 'boost' && (
+        <div className="mb-2 text-sm text-mastodon-text-secondary flex items-center gap-2 pl-12">
+          <span>🔄</span>
+          <span>Boosted</span>
+        </div>
+      )}
+
+      <div className="flex gap-3">
+        {/* 用户头像 */}
+        {actor?.avatarUrl ? (
+          <img
+            src={actor.avatarUrl}
+            alt={actor.displayName}
+            className="w-12 h-12 rounded-full shrink-0 object-cover"
+          />
+        ) : (
+          <div className="w-12 h-12 rounded-full bg-mastodon-border shrink-0" />
+        )}
+
+        <div className="flex-1 min-w-0">
+           {/* Header: Name and Time */}
+           <div className="flex justify-between items-start mb-2">
+              <div className="flex flex-col">
+                 <span className="font-bold text-white text-base leading-snug">{actor?.displayName || 'Me'}</span>
+                 <span className="text-mastodon-text-secondary text-sm leading-snug">@{actor?.preferredUsername || 'me'}</span>
+              </div>
+              
+              <div className="flex items-center gap-1 text-mastodon-text-secondary text-sm whitespace-nowrap ml-4">
+                 <time dateTime={post.publishedAt.toISOString()} className="hover:underline">
+                    {formatDate(post.publishedAt)}
+                 </time>
+                 {post.sensitive && (
+                  <span className="ml-2 px-1.5 py-0.5 bg-mastodon-bg border border-mastodon-border text-xs rounded text-mastodon-warning">
+                    CW
+                  </span>
+                 )}
+              </div>
+           </div>
+
+
+          {/* CW 警告 */}
+          {post.summary && (
+            <div className="mb-3 p-3 bg-mastodon-bg border border-mastodon-border rounded flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-white">{post.summary}</span>
+              </div>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsExpanded(!isExpanded)
+                }}
+                className="text-xs text-mastodon-text-link uppercase font-bold hover:underline cursor-pointer"
+              >
+                {isExpanded ? 'Show less' : 'Show more'}
+              </button>
+            </div>
+          )}
+
+          {/* 帖子内容 */}
+          {post.content && (!post.summary || isExpanded) && ( 
+            <div
+              className="prose prose-invert prose-sm max-w-none mb-3 text-mastodon-text-primary leading-snug"
+              dangerouslySetInnerHTML={{ __html: getHighlightedContent(post.content, highlight) }}
+            />
+          )}
+
+          {/* 媒体附件 */}
+          {media && media.length > 0 && (!post.summary || isExpanded) && (
+            <div className={`grid gap-2 mb-3 mt-3 rounded-lg overflow-hidden ${
+              media.length === 1 ? 'grid-cols-1' :
+              media.length === 2 ? 'grid-cols-2' :
+              media.length === 3 ? 'grid-cols-3' :
+              'grid-cols-2'
+            }`}>
+              {media.map((m) => (
+                <div key={m.id} className="relative bg-black aspect-video flex items-center justify-center overflow-hidden">
+                  {m.type === 'image' && (
+                    <img
+                      src={m.url}
+                      alt={m.filename}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  )}
+                  {m.type === 'video' && (
+                    <video
+                      src={m.url}
+                      controls
+                      className="w-full h-full"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 标签 */}
+          {post.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {post.tags.map((tag, index) => (
+                <span
+                  key={index}
+                  className="text-mastodon-text-link hover:underline text-sm"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* View Original Link */}
+          <div className="flex justify-end mt-4">
+             <a 
+               href={post.activityId} 
+               target="_blank" 
+               rel="noopener noreferrer"
+               onClick={(e) => e.stopPropagation()}
+               className="flex items-center gap-1.5 text-xs text-mastodon-text-secondary hover:text-mastodon-primary transition-colors"
+               title="View Original on Server"
+             >
+               <ExternalLink className="w-3.5 h-3.5" />
+               <span>View Original</span>
+             </a>
+          </div>
+
+          {/* 回复信息 */}
+          {post.inReplyTo && (
+            <div className="mt-3 text-xs text-mastodon-text-secondary flex items-center gap-1">
+              <span>↩️ In reply to a post</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </article>
+  )
+}
