@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { Upload, FileArchive, Loader2, Cloud, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { Upload, FileArchive, Loader2, Cloud, ArrowRight } from 'lucide-react'
 import { ArchiveParser } from '../../lib/parser'
 import type { ParseProgress } from '../../types'
 

@@ -331,7 +331,7 @@ export function StatsPage() {
                 return (
                   <div className="flex gap-1">
                     {/* Render each week as a column */}
-                    {weeks.map((weekStart, weekIdx) => {
+                    {weeks.map((weekStart: Date, weekIdx: number) => {
                        // Generate 7 days for this week
                        const weekDays = Array.from({ length: 7 }).map((_, i) => {
                           const d = new Date(weekStart)
