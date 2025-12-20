@@ -54,43 +54,50 @@ function App() {
   return (
     <MainLayout
       leftSidebar={
-        <div className="space-y-6 flex flex-col h-full">
-          <div className="px-6 py-4 cursor-pointer" onClick={() => navigate('/')}>
-             <h1 className="text-xl font-bold text-white">Mastodon</h1>
+        <div className="flex flex-col h-full">
+          <div className="px-8 py-6 cursor-pointer border-b border-mastodon-border" onClick={() => navigate('/')}>
+             <h1 className="text-2xl font-bold text-white mb-1">Mastodon</h1>
              <p className="text-sm text-mastodon-text-secondary">Archive Viewer</p>
           </div>
-          
-          <nav className="flex flex-col space-y-2 px-4 flex-1">
-             <button onClick={() => { navigate('/'); setSelectedPostId(undefined) }} className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer">
-               <Home className="w-6 h-6" /> 
+
+          <nav className="flex flex-col space-y-2 px-6 py-6 flex-1">
+             <button
+               onClick={() => { navigate('/'); setSelectedPostId(undefined) }}
+               className="flex items-center gap-4 px-6 py-4 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
+             >
+               <Home className="w-6 h-6" />
                <span className="text-lg">Home</span>
              </button>
 
-             <button className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer">
+             <button className="flex items-center gap-4 px-6 py-4 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer">
                 <BarChart3 className="w-6 h-6" />
                 <span className="text-lg">Statistics</span>
              </button>
-             <button className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer">
+
+             <button className="flex items-center gap-4 px-6 py-4 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer">
                 <User className="w-6 h-6" />
                 <span className="text-lg">Profile</span>
              </button>
-             
-             <button onClick={() => navigate('/debug')} className="flex items-center gap-4 px-4 py-3 text-gray-500 font-medium hover:bg-mastodon-surface hover:text-gray-300 transition-colors rounded-full mt-auto cursor-pointer">
-                <span className="text-lg">🛠️</span>
-                <span>Debug</span>
+
+             <button
+               onClick={() => navigate('/debug')}
+               className="flex items-center gap-4 px-6 py-4 text-gray-500 font-medium hover:bg-mastodon-surface hover:text-gray-300 transition-colors rounded-full mt-auto cursor-pointer"
+             >
+                <span className="text-xl">🛠️</span>
+                <span className="text-lg">Debug</span>
              </button>
           </nav>
 
-          <div className="px-6 pb-6">
+          <div className="px-6 pb-8 border-t border-mastodon-border pt-6">
             <button
                onClick={async () => {
                  if (confirm('Are you sure you want to clear all data?')) {
                    await db.clearAll()
                    setHasData(false)
-                   navigate('/') // Reset route on clear
+                   navigate('/')
                  }
                }}
-               className="flex items-center justify-center gap-2 w-full py-3 text-red-500 hover:bg-red-500/10 rounded-full font-medium transition-colors cursor-pointer"
+               className="flex items-center justify-center gap-3 w-full px-6 py-4 text-red-500 hover:bg-red-500/10 rounded-full font-medium transition-colors cursor-pointer"
             >
               <Trash2 className="w-5 h-5" />
               <span>Clear Data</span>
@@ -115,7 +122,6 @@ function App() {
     >
       <Routes>
          <Route path="/" element={<Timeline onPostClick={(id) => setSelectedPostId(id)} />} />
-         <Route path="/post/:id" element={<ThreadView />} />
          <Route path="/debug" element={<DebugDashboard />} />
       </Routes>
     </MainLayout>

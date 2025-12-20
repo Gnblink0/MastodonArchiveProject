@@ -1,4 +1,6 @@
 import JSZip from 'jszip'
+import * as pako from 'pako'
+import untar from 'js-untar'
 import { db } from './db'
 import type {
   Actor,
@@ -13,6 +15,21 @@ import type {
   ActivityPubNote
 } from '../types'
 
+// Unified file interface for both ZIP and tar.gz
+interface ArchiveFile {
+  name: string
+  dir: boolean
+  async(type: 'string'): Promise<string>
+  async(type: 'blob'): Promise<Blob>
+  async(type: 'arraybuffer'): Promise<ArrayBuffer>
+}
+
+interface ArchiveContainer {
+  file(path: string): ArchiveFile | null
+  file(regex: RegExp): ArchiveFile[]
+  forEach(callback: (relativePath: string, file: ArchiveFile) => void): void
+}
+
 export class ArchiveParser {
   private onProgress?: (progress: ParseProgress) => void
 
@@ -23,22 +40,22 @@ export class ArchiveParser {
   async parseArchive(file: File): Promise<ArchiveMetadata> {
     this.reportProgress('开始解析', 0, 100)
 
-    // 解压 ZIP
-    const zip = await JSZip.loadAsync(file)
+    // Detect file type and load appropriate format
+    const container = await this.loadArchive(file)
 
     // 调试：列出所有文件
-    console.log('=== ZIP 文件列表 ===')
-    zip.forEach((relativePath, file) => {
-      console.log(relativePath, file.dir ? '(目录)' : '(文件)')
+    console.log('=== 存档文件列表 ===')
+    container.forEach((relativePath, archiveFile) => {
+      console.log(relativePath, archiveFile.dir ? '(目录)' : '(文件)')
     })
     console.log('===================')
 
     // 解析各个部分
-    const actor = await this.parseActor(zip)
-    const posts = await this.parsePosts(zip)
-    const likes = await this.parseLikes(zip)
-    const bookmarks = await this.parseBookmarks(zip)
-    const media = await this.parseMedia(zip)
+    const actor = await this.parseActor(container)
+    const posts = await this.parsePosts(container)
+    const likes = await this.parseLikes(container)
+    const bookmarks = await this.parseBookmarks(container)
+    const media = await this.parseMedia(container)
 
     // 保存到数据库
     await this.saveToDatabase(actor, posts, likes, bookmarks, media)
@@ -62,15 +79,81 @@ export class ArchiveParser {
     return metadata
   }
 
-  private async parseActor(zip: JSZip): Promise<Actor> {
+  private async loadArchive(file: File): Promise<ArchiveContainer> {
+    const filename = file.name.toLowerCase()
+
+    if (filename.endsWith('.tar.gz') || filename.endsWith('.tgz')) {
+      this.reportProgress('解压 tar.gz 文件', 10, 100)
+      return await this.loadTarGz(file)
+    } else {
+      this.reportProgress('解压 ZIP 文件', 10, 100)
+      return await this.loadZip(file)
+    }
+  }
+
+  private async loadZip(file: File): Promise<ArchiveContainer> {
+    const zip = await JSZip.loadAsync(file)
+    // JSZip already implements our interface, just wrap it
+    return zip as any as ArchiveContainer
+  }
+
+  private async loadTarGz(file: File): Promise<ArchiveContainer> {
+    // Read file as ArrayBuffer
+    const arrayBuffer = await file.arrayBuffer()
+
+    // Decompress gzip
+    const decompressed = pako.ungzip(new Uint8Array(arrayBuffer))
+
+    // Extract tar
+    const files = await untar(decompressed.buffer)
+
+    // Create a container that mimics JSZip's interface
+    const fileMap = new Map<string, any>()
+    const fileList: any[] = []
+
+    for (const file of files) {
+      const archiveFile = {
+        name: file.name,
+        dir: file.type === '5', // Directory type in tar
+        async(type: 'string' | 'blob' | 'arraybuffer'): Promise<any> {
+          if (type === 'string') {
+            return Promise.resolve(new TextDecoder().decode(file.buffer))
+          } else if (type === 'blob') {
+            return Promise.resolve(new Blob([file.buffer]))
+          } else if (type === 'arraybuffer') {
+            return Promise.resolve(file.buffer)
+          }
+          throw new Error(`Unknown type: ${type}`)
+        }
+      }
+
+      fileMap.set(file.name, archiveFile)
+      fileList.push(archiveFile)
+    }
+
+    return {
+      file(pathOrRegex: string | RegExp): any {
+        if (typeof pathOrRegex === 'string') {
+          return fileMap.get(pathOrRegex) || null
+        } else {
+          return fileList.filter(f => pathOrRegex.test(f.name))
+        }
+      },
+      forEach(callback: (relativePath: string, file: any) => void): void {
+        fileList.forEach(f => callback(f.name, f))
+      }
+    }
+  }
+
+  private async parseActor(container: ArchiveContainer): Promise<Actor> {
     this.reportProgress('解析用户信息', 0, 1)
 
     // 查找 actor.json（支持根目录或子目录）
-    let actorFile = zip.file('actor.json')
+    let actorFile = container.file('actor.json')
 
     if (!actorFile) {
       // 尝试在所有文件中查找
-      const actorFiles = zip.file(/actor\.json$/i)
+      const actorFiles = container.file(/actor\.json$/i)
       if (actorFiles.length > 0) {
         actorFile = actorFiles[0]
         console.log(`在 ${actorFile.name} 找到 actor.json`)
@@ -88,7 +171,7 @@ export class ArchiveParser {
     let avatarBlob: Blob | undefined
     let avatarUrl: string | undefined
     if (json.icon?.url) {
-      const avatarFile = zip.file(json.icon.url)
+      const avatarFile = container.file(json.icon.url)
       if (avatarFile) {
         avatarBlob = await avatarFile.async('blob')
         avatarUrl = URL.createObjectURL(avatarBlob)
@@ -99,7 +182,7 @@ export class ArchiveParser {
     let headerBlob: Blob | undefined
     let headerUrl: string | undefined
     if (json.image?.url) {
-      const headerFile = zip.file(json.image.url)
+      const headerFile = container.file(json.image.url)
       if (headerFile) {
         headerBlob = await headerFile.async('blob')
         headerUrl = URL.createObjectURL(headerBlob)
@@ -127,11 +210,11 @@ export class ArchiveParser {
     return actor
   }
 
-  private async parsePosts(zip: JSZip): Promise<Post[]> {
+  private async parsePosts(container: ArchiveContainer): Promise<Post[]> {
     // 查找 outbox.json
-    let outboxFile = zip.file('outbox.json')
+    let outboxFile = container.file('outbox.json')
     if (!outboxFile) {
-      const outboxFiles = zip.file(/outbox\.json$/i)
+      const outboxFiles = container.file(/outbox\.json$/i)
       if (outboxFiles.length > 0) {
         outboxFile = outboxFiles[0]
         console.log(`在 ${outboxFile.name} 找到 outbox.json`)
@@ -235,8 +318,8 @@ export class ArchiveParser {
     return posts
   }
 
-  private async parseMedia(zip: JSZip): Promise<Media[]> {
-    const mediaFiles = zip.file(/^media_attachments\//)
+  private async parseMedia(container: ArchiveContainer): Promise<Media[]> {
+    const mediaFiles = container.file(/^media_attachments\//)
 
     this.reportProgress('解析媒体文件', 0, mediaFiles.length)
 
@@ -248,8 +331,21 @@ export class ArchiveParser {
       // 跳过目录
       if (file.dir) continue
 
-      const blob = await file.async('blob')
       const filename = file.name.split('/').pop() || ''
+
+      // Detect MIME type from filename extension
+      const mimeType = this.getMimeTypeFromFilename(filename)
+
+      // Get blob data and create properly typed blob
+      const arrayBuffer = await file.async('arraybuffer')
+      const blob = new Blob([arrayBuffer], { type: mimeType })
+
+      console.log('Parsing media file:', {
+        filename,
+        detectedMimeType: mimeType,
+        blobType: blob.type,
+        blobSize: blob.size
+      })
 
       // Use filename as ID to match parsePosts logic
       const id = filename
@@ -257,7 +353,7 @@ export class ArchiveParser {
       media.push({
         id,
         filename,
-        type: this.detectMediaType(blob.type),
+        type: this.detectMediaType(mimeType),
         blob,
         url: URL.createObjectURL(blob)
       })
@@ -272,11 +368,11 @@ export class ArchiveParser {
     return media
   }
 
-  private async parseLikes(zip: JSZip): Promise<Like[]> {
+  private async parseLikes(container: ArchiveContainer): Promise<Like[]> {
     // 查找 likes.json（可选文件）
-    let likesFile = zip.file('likes.json')
+    let likesFile = container.file('likes.json')
     if (!likesFile) {
-      const likesFiles = zip.file(/likes\.json$/i)
+      const likesFiles = container.file(/likes\.json$/i)
       if (likesFiles.length > 0) {
         likesFile = likesFiles[0]
         console.log(`在 ${likesFile.name} 找到 likes.json`)
@@ -305,11 +401,11 @@ export class ArchiveParser {
     return likes
   }
 
-  private async parseBookmarks(zip: JSZip): Promise<Bookmark[]> {
+  private async parseBookmarks(container: ArchiveContainer): Promise<Bookmark[]> {
     // 查找 bookmarks.json（可选文件）
-    let bookmarksFile = zip.file('bookmarks.json')
+    let bookmarksFile = container.file('bookmarks.json')
     if (!bookmarksFile) {
-      const bookmarksFiles = zip.file(/bookmarks\.json$/i)
+      const bookmarksFiles = container.file(/bookmarks\.json$/i)
       if (bookmarksFiles.length > 0) {
         bookmarksFile = bookmarksFiles[0]
         console.log(`在 ${bookmarksFile.name} 找到 bookmarks.json`)
@@ -395,6 +491,43 @@ export class ArchiveParser {
     const tmp = document.createElement('div')
     tmp.innerHTML = html
     return tmp.textContent || tmp.innerText || ''
+  }
+
+  private getMimeTypeFromFilename(filename: string): string {
+    const ext = filename.toLowerCase().split('.').pop() || ''
+
+    // Image types
+    const imageTypes: Record<string, string> = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+      'svg': 'image/svg+xml',
+      'bmp': 'image/bmp',
+      'ico': 'image/x-icon'
+    }
+
+    // Video types
+    const videoTypes: Record<string, string> = {
+      'mp4': 'video/mp4',
+      'webm': 'video/webm',
+      'ogg': 'video/ogg',
+      'mov': 'video/quicktime',
+      'avi': 'video/x-msvideo',
+      'mkv': 'video/x-matroska'
+    }
+
+    // Audio types
+    const audioTypes: Record<string, string> = {
+      'mp3': 'audio/mpeg',
+      'wav': 'audio/wav',
+      'ogg': 'audio/ogg',
+      'm4a': 'audio/mp4',
+      'flac': 'audio/flac'
+    }
+
+    return imageTypes[ext] || videoTypes[ext] || audioTypes[ext] || 'application/octet-stream'
   }
 
   private detectMediaType(mimeType: string): Media['type'] {

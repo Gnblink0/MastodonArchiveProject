@@ -92,39 +92,33 @@ export function ThreadView({ postId: propPostId, onClose }: ThreadViewProps) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto pt-4 pb-12">
+    <div className="max-w-2xl mx-auto px-4 py-6">
       {!propPostId && (
-      <div className="mb-4 px-4">
-        <button 
+      <div className="mb-6">
+        <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-mastodon-primary hover:text-mastodon-primary-hover transition-colors font-medium cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2 text-mastodon-primary hover:bg-mastodon-surface transition-colors font-medium cursor-pointer rounded-lg"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-5 h-5" />
           <span>Back</span>
         </button>
       </div>
       )}
-      
+
       {propPostId && onClose && (
-        <div className="mb-4 px-4 flex justify-between items-center">
-            <h2 className="text-lg font-bold text-white">Thread</h2>
-            <button onClick={onClose} className="text-mastodon-text-secondary hover:text-white cursor-pointer">✕</button>
+        <div className="mb-6 flex justify-between items-center border-b border-mastodon-border pb-4">
+            <h2 className="text-xl font-bold text-white">Thread</h2>
+            <button onClick={onClose} className="text-mastodon-text-secondary hover:text-white cursor-pointer text-2xl leading-none px-2">✕</button>
         </div>
       )}
 
-      <div className="flex flex-col">
+      <div className="flex flex-col space-y-3">
         {/* Missing Parent Indicator */}
         {(ancestors.length > 0 ? ancestors[0] : post)?.inReplyTo && (
-           <div className="mb-4 p-4 border border-mastodon-border border-dashed rounded-lg text-center text-mastodon-text-secondary bg-mastodon-bg/50">
+           <div className="mb-4 p-4 border border-mastodon-border border-dashed rounded text-center text-mastodon-text-secondary bg-mastodon-bg/50">
               <p className="mb-2 text-sm">Parent post not found in local archive.</p>
-              <a 
-                 href={(ancestors.length > 0 ? ancestors[0] : post)?.activityId} // This might be wrong, we want the PARENT'S URL. But we don't have it easily unless we store strict InReplyTo URL.
-                 // Actually, we only have the ID.
-                 // But wait, the post object has `activityId` which is the URL.
-                 // We don't have the parent object, so we don't have its URL.
-                 // We only have the Short ID (index).
-                 // However, we can just say "View thread on original instance" using the current post's link?
-                 // Or just a static message.
+              <a
+                 href={(ancestors.length > 0 ? ancestors[0] : post)?.activityId}
                  target="_blank"
                  rel="noopener noreferrer"
                  className="text-mastodon-primary hover:underline text-sm"
@@ -138,19 +132,18 @@ export function ThreadView({ postId: propPostId, onClose }: ThreadViewProps) {
         {ancestors.map(p => (
           <div key={p.id} className="relative">
              <PostCard post={p} />
-              {/* Connecting line idea - styled via border or pseudoelement if needed, but simple stack works for now */}
              <div className="mx-auto w-0.5 h-4 bg-mastodon-border/50"></div>
           </div>
         ))}
-        
+
         {/* Current Post */}
-        <div className="my-2 border-l-4 border-mastodon-primary pl-0 rounded-lg overflow-hidden shadow-lg transform scale-[1.01]">
+        <div className="my-2 border-l-4 border-mastodon-primary pl-0 overflow-hidden">
            <PostCard post={post} />
         </div>
 
         {/* Replies */}
         {replies.length > 0 && (
-           <div className="pl-4 border-l-2 border-mastodon-border ml-6 mt-2 space-y-4">
+           <div className="pl-6 border-l-2 border-mastodon-border ml-6 mt-3 space-y-3">
               {replies.map(p => (
                  <PostCard key={p.id} post={p} />
               ))}

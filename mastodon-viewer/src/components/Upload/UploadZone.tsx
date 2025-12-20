@@ -13,8 +13,11 @@ export function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [error, setError] = useState<string | null>(null)
 
   const handleFile = useCallback(async (file: File) => {
-    if (!file.name.endsWith('.zip')) {
-      setError('请上传 .zip 格式的 Mastodon 存档文件')
+    const fileName = file.name.toLowerCase()
+    const isValidFormat = fileName.endsWith('.zip') || fileName.endsWith('.tar.gz') || fileName.endsWith('.tgz')
+
+    if (!isValidFormat) {
+      setError('请上传 .zip 或 .tar.gz 格式的 Mastodon 存档文件')
       return
     }
 
@@ -118,13 +121,13 @@ export function UploadZone({ onUploadComplete }: UploadZoneProps) {
               Select File
               <input
                 type="file"
-                accept=".zip"
+                accept=".zip,application/zip,.tar.gz,application/gzip,application/x-gzip,.tgz"
                 className="hidden"
                 onChange={handleChange}
               />
             </label>
             <p className="text-xs text-mastodon-text-secondary mt-4">
-              Supports .zip archives exported from Mastodon
+              Supports .zip and .tar.gz archives exported from Mastodon
             </p>
           </div>
         )}
