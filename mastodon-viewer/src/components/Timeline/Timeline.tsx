@@ -5,6 +5,7 @@ import { Loader2, Search as SearchIcon, X } from 'lucide-react'
 import { db } from '../../lib/db'
 import type { Post } from '../../types'
 import Fuse from 'fuse.js'
+import ReactPaginate from 'react-paginate'
 
 interface TimelineProps {
   onPostClick?: (postId: string) => void
@@ -22,12 +23,6 @@ export function Timeline({ onPostClick }: TimelineProps) {
 
   // Data fetching for normal timeline
   const postsCallback = usePosts(pageSize, (page - 1) * pageSize)
-  // usePosts might be returning undefined initially or loading
-  // The hook returns: { posts: Post[], loading: boolean, error: Error, hasMore: boolean, total: number } - wait, looking at my previous view_file of Timeline.tsx (step 370), usePosts returns `Post[] | undefined`.
-  // Wait, looking at Step 330: `const posts = usePosts(pageSize, (page - 1) * pageSize)`
-  // And Step 260/267 showed usePosts source? No, Step 260 viewed usePosts.ts.
-  // Let's assume `usePosts` returns `Post[] | undefined` based on previous Timeline.tsx code `if (!posts) return <Loader...>`.
-  
   const totalCountDB = usePostsCount()
 
   // Load all posts for search indexing
@@ -89,8 +84,8 @@ export function Timeline({ onPostClick }: TimelineProps) {
     return () => clearTimeout(timeoutId)
   }, [query, fuse])
 
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage)
+  const handlePageClick = (event: { selected: number }) => {
+    setPage(event.selected + 1)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -114,8 +109,6 @@ export function Timeline({ onPostClick }: TimelineProps) {
   }
 
   const totalPages = Math.ceil(totalItems / pageSize)
-  const hasNextPage = page < totalPages
-  const hasPrevPage = page > 1
 
   if (isLoading && !query) {
     return (
@@ -181,27 +174,36 @@ export function Timeline({ onPostClick }: TimelineProps) {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-4 py-8 mt-4 border-t border-mastodon-border mx-4">
-               <button
-                  onClick={() => handlePageChange(page - 1)}
-                  disabled={!hasPrevPage}
-                  className="px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-mastodon-surface hover:bg-mastodon-border text-white cursor-pointer"
-               >
-                  Previous
-               </button>
-               
-               <span className="text-sm text-mastodon-text-secondary">
-                  Page {page} of {totalPages}
-               </span>
-
-               <button
-                  onClick={() => handlePageChange(page + 1)}
-                  disabled={!hasNextPage}
-                  className="px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-mastodon-surface hover:bg-mastodon-border text-white cursor-pointer"
-               >
-                  Next
-               </button>
-            </div>
+                <ReactPaginate
+                    breakLabel="..."
+                    nextLabel="Next >"
+                    onPageChange={handlePageClick}
+                    pageRangeDisplayed={3}
+                    pageCount={totalPages}
+                    previousLabel="< Previous"
+                    forcePage={page - 1}
+                    renderOnZeroPageCount={null}
+                    
+                    containerClassName="flex items-center justify-center gap-2 py-8 mt-4 border-t border-mastodon-border mx-4 select-none"
+                    
+                    pageClassName="block"
+                    pageLinkClassName="flex items-center justify-center w-8 h-8 rounded-md bg-mastodon-surface text-mastodon-text-secondary hover:bg-mastodon-primary/20 hover:text-mastodon-primary transition-colors cursor-pointer text-sm"
+                    
+                    activeClassName="block"
+                    activeLinkClassName="!bg-mastodon-primary !text-white hover:bg-mastodon-primary hover:text-white"
+                    
+                    previousClassName="mr-auto sm:mr-2"
+                    previousLinkClassName="px-4 py-2 rounded-lg bg-mastodon-surface text-white font-medium hover:bg-mastodon-border transition-colors cursor-pointer text-sm flex items-center"
+                    
+                    nextClassName="ml-auto sm:ml-2"
+                    nextLinkClassName="px-4 py-2 rounded-lg bg-mastodon-surface text-white font-medium hover:bg-mastodon-border transition-colors cursor-pointer text-sm flex items-center"
+                    
+                    disabledClassName="opacity-50 cursor-not-allowed"
+                    disabledLinkClassName="cursor-not-allowed hover:bg-mastodon-surface"
+                    
+                    breakClassName="flex items-center justify-center w-8 h-8 text-mastodon-text-secondary"
+                    breakLinkClassName="block w-full h-full text-center leading-8"
+                />
             )}
           </>
         )}
