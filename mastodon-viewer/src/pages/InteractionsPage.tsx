@@ -1,16 +1,9 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { ExternalLink, Star, Bookmark as BookmarkIcon, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Star, Bookmark as BookmarkIcon, ChevronLeft, ChevronRight } from 'lucide-react'
 import { EmbeddedPost } from '../components/Timeline/EmbeddedPost'
 import ReactPaginate from 'react-paginate'
-
-interface InteractionItem {
-  id: string
-  url: string
-  timestamp: Date
-  username?: string
-}
 
 interface InteractionsPageProps {
   type: 'likes' | 'bookmarks'

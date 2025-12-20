@@ -9,7 +9,7 @@ import { StatsPage } from './pages/StatsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { InteractionsPage } from './pages/InteractionsPage'
 import { db } from './lib/db'
-import { Home, User, Trash2, BarChart3, Menu, X, Star, Bookmark } from 'lucide-react'
+import { Home, User, Trash2, BarChart3, X, Star, Bookmark } from 'lucide-react'
 
 function App() {
   const [hasData, setHasData] = useState(false)

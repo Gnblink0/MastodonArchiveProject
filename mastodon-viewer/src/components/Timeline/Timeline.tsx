@@ -13,7 +13,7 @@ interface TimelineProps {
   setMobileMenuOpen: (isOpen: boolean) => void
 }
 
-export function Timeline({ onPostClick, mobileMenuOpen, setMobileMenuOpen }: TimelineProps) {
+export function Timeline({ onPostClick, setMobileMenuOpen }: TimelineProps) {
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   
