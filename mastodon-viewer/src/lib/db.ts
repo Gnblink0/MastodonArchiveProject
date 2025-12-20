@@ -25,6 +25,10 @@ class MastodonArchiveDB extends Dexie {
     this.version(2).stores({
       posts: 'id, timestamp, *tags, publishedAt, type, inReplyTo'
     })
+
+    this.version(3).stores({
+      posts: 'id, timestamp, *tags, publishedAt, type, inReplyTo, visibility'
+    })
   }
 
   // 清空所有数据

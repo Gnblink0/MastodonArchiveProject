@@ -1,4 +1,5 @@
-import JSZip from 'jszip'
+import { BlobReader, BlobWriter, ZipReader } from '@zip.js/zip.js'
+import type { Entry } from '@zip.js/zip.js'
 import * as pako from 'pako'
 import untar from 'js-untar'
 import { db } from './db'
@@ -92,9 +93,64 @@ export class ArchiveParser {
   }
 
   private async loadZip(file: File): Promise<ArchiveContainer> {
-    const zip = await JSZip.loadAsync(file)
-    // JSZip already implements our interface, just wrap it
-    return zip as any as ArchiveContainer
+    // Use zip.js for better large file support (>2GB)
+    const zipFileReader = new BlobReader(file)
+    const zipReader = new ZipReader(zipFileReader)
+    const entries = await zipReader.getEntries()
+
+    // Create a map for fast lookup
+    const fileMap = new Map<string, Entry>()
+    for (const entry of entries) {
+      fileMap.set(entry.filename, entry)
+    }
+
+    // Wrapper to convert zip.js Entry to our ArchiveFile interface
+    const wrapEntry = (entry: Entry): ArchiveFile => {
+      const asyncMethod = async (type: 'string' | 'blob' | 'arraybuffer'): Promise<any> => {
+        if (entry.directory) {
+          return type === 'string' ? '' : new ArrayBuffer(0)
+        }
+
+        if (!entry.getData) {
+          throw new Error(`Entry ${entry.filename} has no getData method`)
+        }
+
+        if (type === 'string') {
+          const blob = await entry.getData(new BlobWriter())
+          return blob.text()
+        } else if (type === 'blob') {
+          return entry.getData(new BlobWriter())
+        } else if (type === 'arraybuffer') {
+          const blob = await entry.getData(new BlobWriter())
+          return blob.arrayBuffer()
+        }
+        throw new Error(`Unknown type: ${type}`)
+      }
+
+      return {
+        name: entry.filename,
+        dir: entry.directory,
+        async: asyncMethod
+      }
+    }
+
+    return {
+      file(pathOrRegex: string | RegExp): any {
+        if (typeof pathOrRegex === 'string') {
+          const entry = fileMap.get(pathOrRegex)
+          return entry ? wrapEntry(entry) : null
+        } else {
+          return entries
+            .filter(e => pathOrRegex.test(e.filename))
+            .map(e => wrapEntry(e))
+        }
+      },
+      forEach(callback: (relativePath: string, file: ArchiveFile) => void): void {
+        entries.forEach(entry => {
+          callback(entry.filename, wrapEntry(entry))
+        })
+      }
+    }
   }
 
   private async loadTarGz(file: File): Promise<ArchiveContainer> {
@@ -256,6 +312,32 @@ export class ArchiveParser {
 
         const postId = extractId(obj.id)
         const inReplyToId = obj.inReplyTo ? extractId(obj.inReplyTo) : undefined
+        
+        // Determine Visibility
+        // Public: in to field and matches public constant
+        // Unlisted: in cc field and matches public constant
+        // Private: followers only
+        // Direct: specific users only
+        const PUBLIC_COLLECTION = 'https://www.w3.org/ns/activitystreams#Public'
+        let visibility: 'public' | 'unlisted' | 'private' | 'direct' = 'direct'
+        
+        const to = obj.to || []
+        const cc = obj.cc || []
+        
+        if (to.includes(PUBLIC_COLLECTION)) {
+          visibility = 'public'
+        } else if (cc.includes(PUBLIC_COLLECTION)) {
+          visibility = 'unlisted'
+        } else if (to.some(url => url.includes('followers'))) {
+          // Simplistic check for followers collection
+          visibility = 'private'
+        }
+
+        // Extract Mentions
+        const mentions = obj.tag?.filter(t => t.type === 'Mention').map(t => ({ // Fix: t.type casing might vary, usually 'Mention'
+             name: t.name || '',
+             url: t.href || ''
+        })) || []
 
         posts.push({
           id: postId,
@@ -267,6 +349,7 @@ export class ArchiveParser {
           timestamp: new Date(obj.published).getTime(),
           tags: obj.tag?.filter(t => t.type === 'Hashtag')
                        .map(t => t.name?.replace('#', '') || '') || [],
+          mentions,
           mediaIds: obj.attachment?.map(a => {
             // Simple helper to get filename from URL
             const getFilename = (url: string) => {
@@ -277,7 +360,9 @@ export class ArchiveParser {
           }) || [],
           inReplyTo: inReplyToId,
           sensitive: obj.sensitive || false,
-          summary: obj.summary
+          visibility,
+          summary: obj.summary,
+          originalUrl: obj.id
         })
       } else if (item.type === 'Announce') {
         // 确保有有效的 ID
@@ -298,9 +383,12 @@ export class ArchiveParser {
           publishedAt: new Date(item.published),
           timestamp: new Date(item.published).getTime(),
           tags: [],
+          mentions: [],
           mediaIds: [],
           sensitive: false,
-          boostedPostId: typeof item.object === 'string' ? item.object : undefined
+          visibility: 'public', // Boosts are usually public
+          boostedPostId: typeof item.object === 'string' ? item.object : undefined,
+          originalUrl: item.id
         })
       }
 
@@ -393,6 +481,7 @@ export class ArchiveParser {
       id: item.id,
       activityId: item.id,
       likedPostId: item.object,
+      targetUrl: item.object,
       likedAt: new Date(item.published || Date.now())
     }))
 
@@ -426,6 +515,7 @@ export class ArchiveParser {
       id: item.id,
       activityId: item.id,
       bookmarkedPostId: item.object,
+      targetUrl: item.object,
       bookmarkedAt: new Date(item.published || Date.now())
     }))
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { PostCard } from './PostCard'
 import { usePosts, usePostsCount } from '../../hooks/usePosts'
-import { Loader2, Search as SearchIcon, X } from 'lucide-react'
+import { Loader2, Search as SearchIcon, X, ChevronLeft, ChevronRight, Menu } from 'lucide-react'
 import { db } from '../../lib/db'
 import type { Post } from '../../types'
 import Fuse from 'fuse.js'
@@ -9,10 +9,12 @@ import ReactPaginate from 'react-paginate'
 
 interface TimelineProps {
   onPostClick?: (postId: string) => void
+  mobileMenuOpen: boolean
+  setMobileMenuOpen: (isOpen: boolean) => void
 }
 
-export function Timeline({ onPostClick }: TimelineProps) {
-  const [pageSize] = useState(20)
+export function Timeline({ onPostClick, mobileMenuOpen, setMobileMenuOpen }: TimelineProps) {
+  const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   
   // Search State
@@ -89,6 +91,11 @@ export function Timeline({ onPostClick }: TimelineProps) {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize)
+    setPage(1) // Reset to first page when changing page size
+  }
+
   // Determine what to display
   let displayedPosts: Post[] = []
   let totalItems = 0
@@ -120,39 +127,43 @@ export function Timeline({ onPostClick }: TimelineProps) {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-4">
-      {/* Search Bar */}
-      <div className="mb-4">
-        <div className={`
-            flex items-center w-full bg-mastodon-surface
-            border-2 transition-colors duration-200 rounded-full overflow-hidden
-            ${query ? 'border-mastodon-primary' : 'border-mastodon-border hover:border-mastodon-text-secondary focus-within:border-mastodon-primary'}
-        `}>
-            <div className="pl-5 text-mastodon-text-secondary">
-                <SearchIcon className="w-5 h-5" />
-            </div>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Search posts..."
-              className="w-full bg-transparent border-none py-4 px-4 text-mastodon-text-primary placeholder:text-mastodon-text-secondary/50 focus:outline-none focus:ring-0 text-base"
-            />
-            {query && (
-                <button
-                  onClick={clearSearch}
-                  className="pr-5 text-mastodon-text-secondary hover:text-white transition-colors cursor-pointer"
-                >
-                    <X className="w-5 h-5" />
-                </button>
-            )}
-        </div>
+      {/* Search Bar and Mobile Menu Button */}
+      <div className="mb-4 flex items-center gap-2">
+        {/* Mobile Menu Button */}
+        <button
+          onClick={() => setMobileMenuOpen(true)}
+          className="md:hidden bg-mastodon-surface p-3 rounded-full text-white"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
 
-        {/* Search Stats */}
-        {query && (
-          <div className="mt-3 ml-2 text-sm text-mastodon-text-secondary">
-             {searchResults.length === 0 ? 'No matches found' : `Found ${searchResults.length} match${searchResults.length === 1 ? '' : 'es'}`}
+        {/* Search Bar */}
+        <div className="flex-1">
+          <div className={`
+              flex items-center w-full bg-mastodon-surface
+              border-2 transition-colors duration-200 rounded-full overflow-hidden
+              ${query ? 'border-mastodon-primary' : 'border-mastodon-border hover:border-mastodon-text-secondary focus-within:border-mastodon-primary'}
+          `}>
+              <div className="pl-5 text-mastodon-text-secondary">
+                  <SearchIcon className="w-5 h-5" />
+              </div>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => handleSearch(e.target.value)}
+                placeholder="Search posts..."
+                className="w-full bg-transparent border-none py-4 px-4 text-mastodon-text-primary placeholder:text-mastodon-text-secondary/50 focus:outline-none focus:ring-0 text-base"
+              />
+              {query && (
+                  <button
+                    onClick={clearSearch}
+                    className="pr-5 text-mastodon-text-secondary hover:text-white transition-colors cursor-pointer"
+                  >
+                      <X className="w-5 h-5" />
+                  </button>
+              )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Posts List */}
@@ -174,36 +185,54 @@ export function Timeline({ onPostClick }: TimelineProps) {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-                <ReactPaginate
-                    breakLabel="..."
-                    nextLabel="Next >"
-                    onPageChange={handlePageClick}
-                    pageRangeDisplayed={3}
-                    pageCount={totalPages}
-                    previousLabel="< Previous"
-                    forcePage={page - 1}
-                    renderOnZeroPageCount={null}
+                <div className="mt-4 border-t border-mastodon-border pt-4 px-4">
+                  {/* Page Size Selector */}
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <span className="text-sm text-mastodon-text-secondary">Posts per page:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                      className="bg-mastodon-surface text-mastodon-text-primary border border-mastodon-border rounded px-3 py-1 text-sm cursor-pointer"
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
 
-                    containerClassName="flex items-center justify-center gap-2 py-8 mt-4 border-t border-mastodon-border mx-4 select-none"
+                  {/* Pagination */}
+                  <ReactPaginate
+                      breakLabel="..."
+                      nextLabel={<ChevronRight className="w-5 h-5" />}
+                      onPageChange={handlePageClick}
+                      pageRangeDisplayed={3}
+                      pageCount={totalPages}
+                      previousLabel={<ChevronLeft className="w-5 h-5" />}
+                      forcePage={page - 1}
+                      renderOnZeroPageCount={null}
 
-                    pageClassName="block"
-                    pageLinkClassName="flex items-center justify-center w-8 h-8 rounded-md bg-mastodon-surface text-mastodon-text-secondary hover:bg-mastodon-primary/20 hover:text-mastodon-primary transition-colors cursor-pointer text-sm"
+                      containerClassName="flex items-center justify-center gap-2 py-4 select-none"
 
-                    activeClassName="block"
-                    activeLinkClassName="!bg-mastodon-primary !text-white hover:bg-mastodon-primary hover:text-white"
+                      pageClassName="block"
+                      pageLinkClassName="flex items-center justify-center w-8 h-8 rounded-md bg-mastodon-surface text-mastodon-text-secondary hover:bg-mastodon-primary/20 hover:text-mastodon-primary transition-colors cursor-pointer text-sm"
 
-                    previousClassName="mr-auto sm:mr-2"
-                    previousLinkClassName="px-4 py-2 rounded-lg bg-mastodon-surface text-white font-medium hover:bg-mastodon-border transition-colors cursor-pointer text-sm flex items-center"
+                      activeClassName="block"
+                      activeLinkClassName="!bg-mastodon-primary !text-white hover:bg-mastodon-primary hover:text-white"
 
-                    nextClassName="ml-auto sm:ml-2"
-                    nextLinkClassName="px-4 py-2 rounded-lg bg-mastodon-surface text-white font-medium hover:bg-mastodon-border transition-colors cursor-pointer text-sm flex items-center"
+                      previousClassName="mr-auto sm:mr-2"
+                      previousLinkClassName="p-2 rounded-lg bg-mastodon-surface text-white hover:bg-mastodon-border transition-colors cursor-pointer flex items-center"
 
-                    disabledClassName="opacity-50 cursor-not-allowed"
-                    disabledLinkClassName="cursor-not-allowed hover:bg-mastodon-surface"
+                      nextClassName="ml-auto sm:ml-2"
+                      nextLinkClassName="p-2 rounded-lg bg-mastodon-surface text-white hover:bg-mastodon-border transition-colors cursor-pointer flex items-center"
 
-                    breakClassName="flex items-center justify-center w-8 h-8 text-mastodon-text-secondary"
-                    breakLinkClassName="block w-full h-full text-center leading-8"
-                />
+                      disabledClassName="opacity-50 cursor-not-allowed"
+                      disabledLinkClassName="cursor-not-allowed hover:bg-mastodon-surface"
+
+                      breakClassName="flex items-center justify-center w-8 h-8 text-mastodon-text-secondary"
+                      breakLinkClassName="block w-full h-full text-center leading-8"
+                  />
+                </div>
             )}
           </>
         )}

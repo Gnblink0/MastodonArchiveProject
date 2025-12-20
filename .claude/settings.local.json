@@ -5,7 +5,8 @@
       "Bash(python3:*)",
       "Bash(npm create:*)",
       "Bash(npm install:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }

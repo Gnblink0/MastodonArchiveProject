@@ -1,4 +1,4 @@
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Reply } from 'lucide-react'
 import type { Post } from '../../types'
 import { useMedia, useActor } from '../../hooks/usePosts'
 import { useEffect, useState } from 'react'
@@ -60,9 +60,26 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
     setLightboxOpen(true)
   }
 
-  // Highlight helper
+  // Content cleaner helper
+  const cleanContent = (content: string) => {
+    if (!content) return content
+    // Remove trailing hashtag links
+    // Matches <a ...>#tag</a> followed by optional whitespace at the end of string
+    // We execute this in a loop to remove multiple trailing tags
+    let cleaned = content
+    const tagRegex = /(?:<p>)?\s*<a [^>]*class="[^"]*hashtag[^"]*"[^>]*>#[^<]+<\/a>\s*(?:<\/p>)?\s*$/i
+    
+    while (tagRegex.test(cleaned)) {
+      cleaned = cleaned.replace(tagRegex, '')
+    }
+    
+    return cleaned
+  }
+
   const getHighlightedContent = (content: string, term?: string) => {
-    if (!term || !term.trim()) return content
+    const cleanedContent = cleanContent(content)
+    
+    if (!term || !term.trim()) return cleanedContent
     
     try {
       // Escape special regex characters
@@ -70,12 +87,20 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
       // Match the term only if it's NOT inside an HTML tag
       const regex = new RegExp(`(${escapedTerm})(?![^<]*>)`, 'gi')
       
-      return content.replace(regex, '<mark class="bg-yellow-500/30 text-white rounded-sm px-0.5 font-bold">$1</mark>')
+      return cleanedContent.replace(regex, '<mark class="bg-yellow-500/30 text-white rounded-sm px-0.5 font-bold">$1</mark>')
     } catch (e) {
       console.error('Highlight error', e)
-      return content
+      return cleanedContent
     }
   }
+
+  // Lightbox slides
+  const slides = media
+    ?.filter(m => m.type === 'image')
+    .map(m => ({
+      src: m.url,
+      alt: m.filename,
+    })) || []
 
   return (
     <article
@@ -105,9 +130,9 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
         <div className="flex-1 min-w-0">
            {/* Header: Name and Time */}
            <div className="flex justify-between items-start mb-2">
-              <div className="flex flex-col">
-                 <span className="font-bold text-white text-base leading-snug">{actor?.displayName || 'Me'}</span>
-                 <span className="text-mastodon-text-secondary text-sm leading-snug">@{actor?.preferredUsername || 'me'}</span>
+              <div className="flex flex-col min-w-0 mr-2">
+                 <span className="font-bold text-white text-base leading-snug truncate">{actor?.displayName || 'Me'}</span>
+                 <span className="text-mastodon-text-secondary text-sm leading-snug truncate">@{actor?.preferredUsername || 'me'}</span>
               </div>
 
               <div className="flex items-center gap-1 text-mastodon-text-secondary text-sm whitespace-nowrap ml-4">
@@ -144,7 +169,7 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
           {/* 帖子内容 */}
           {post.content && (!post.summary || isExpanded) && (
             <div
-              className="prose prose-invert prose-sm max-w-none mb-3 text-mastodon-text-primary leading-snug"
+              className="prose prose-invert prose-sm max-w-none mb-3 text-mastodon-text-primary leading-snug break-words overflow-hidden"
               dangerouslySetInnerHTML={{ __html: getHighlightedContent(post.content, highlight) }}
             />
           )}
@@ -194,42 +219,42 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
             </div>
           )}
 
-          {/* View Original Link */}
-          <div className="flex justify-end mt-4">
+          {/* Footer Actions */}
+          <div className="flex items-center justify-between mt-4 text-xs text-mastodon-text-secondary">
+            {post.inReplyTo ? (
+               <div className="flex items-center gap-1.5">
+                  <Reply className="w-3.5 h-3.5" />
+                  <span>In reply to a post</span>
+               </div>
+            ) : <div />}
+
              <a 
                href={post.activityId} 
                target="_blank" 
                rel="noopener noreferrer"
                onClick={(e) => e.stopPropagation()}
-               className="flex items-center gap-1.5 text-xs text-mastodon-text-secondary hover:text-mastodon-primary transition-colors"
+               className="flex items-center gap-1.5 hover:text-mastodon-primary transition-colors"
                title="View Original on Server"
              >
                <ExternalLink className="w-3.5 h-3.5" />
                <span>View Original</span>
              </a>
           </div>
-
-          {/* 回复信息 */}
-          {post.inReplyTo && (
-            <div className="mt-3 text-xs text-mastodon-text-secondary flex items-center gap-1">
-              <span>↩️ In reply to a post</span>
-            </div>
-          )}
         </div>
       </div>
 
       {/* Lightbox for images */}
-      {media && media.length > 0 && (
+      {slides.length > 0 && (
         <Lightbox
           open={lightboxOpen}
           close={() => setLightboxOpen(false)}
           index={lightboxIndex}
-          slides={media
-            .filter(m => m.type === 'image')
-            .map(m => ({
-              src: m.url,
-              alt: m.filename,
-            }))}
+          slides={slides}
+          carousel={{ finite: true }}
+          render={{
+            buttonPrev: slides.length <= 1 ? () => null : undefined,
+            buttonNext: slides.length <= 1 ? () => null : undefined,
+          }}
           plugins={[Zoom]}
           zoom={{
             maxZoomPixelRatio: 3,

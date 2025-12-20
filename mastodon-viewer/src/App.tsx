@@ -1,18 +1,22 @@
 import { useState, useEffect } from 'react'
-import { Routes, Route, useNavigate } from 'react-router-dom'
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { UploadZone } from './components/Upload/UploadZone'
 import { Timeline } from './components/Timeline/Timeline'
 import { ThreadView } from './components/Thread/ThreadView'
 import { DebugDashboard } from './components/Debug/DebugDashboard'
 import { MainLayout } from './components/Layout/MainLayout'
+import { StatsPage } from './pages/StatsPage'
+import { ProfilePage } from './pages/ProfilePage'
 import { db } from './lib/db'
-import { Home, User, Trash2, BarChart3 } from 'lucide-react'
+import { Home, User, Trash2, BarChart3, Menu, X } from 'lucide-react'
 
 function App() {
   const [hasData, setHasData] = useState(false)
   const [loading, setLoading] = useState(true)
   const [selectedPostId, setSelectedPostId] = useState<string | undefined>(undefined)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     // 检查是否已有数据
@@ -49,80 +53,119 @@ function App() {
     )
   }
 
+  const handlePostClick = (postId: string) => {
+    // On mobile, navigate to thread page; on desktop, show in right sidebar
+    if (window.innerWidth < 1024) { // lg breakpoint
+      navigate(`/post/${postId}`)
+    } else {
+      setSelectedPostId(postId)
+    }
+  }
+
+  const leftSidebarContent = (
+    <div className="space-y-6 flex flex-col h-full">
+      <div className="px-6 py-4 cursor-pointer" onClick={() => { navigate('/'); setMobileMenuOpen(false) }}>
+         <h1 className="text-xl font-bold text-white">Mastodon</h1>
+         <p className="text-sm text-mastodon-text-secondary">Archive Viewer</p>
+      </div>
+
+      <nav className="flex flex-col space-y-2 px-4 flex-1">
+         <button
+           onClick={() => { navigate('/'); setSelectedPostId(undefined); setMobileMenuOpen(false) }}
+           className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
+         >
+           <Home className="w-6 h-6" />
+           <span className="text-lg">Home</span>
+         </button>
+
+         <button 
+            onClick={() => { navigate('/stats'); setMobileMenuOpen(false) }}
+            className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
+         >
+            <BarChart3 className="w-6 h-6" />
+            <span className="text-lg">Statistics</span>
+         </button>
+
+         <button 
+            onClick={() => { navigate('/profile'); setMobileMenuOpen(false) }}
+            className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
+         >
+            <User className="w-6 h-6" />
+            <span className="text-lg">Profile</span>
+         </button>
+
+
+      </nav>
+
+      <div className="px-6 pb-6">
+        <button
+           onClick={async () => {
+             if (confirm('Are you sure you want to clear all data?')) {
+               await db.clearAll()
+               setHasData(false)
+               navigate('/')
+               setMobileMenuOpen(false)
+             }
+           }}
+           className="flex items-center justify-center gap-2 w-full py-3 text-red-500 hover:bg-red-500/10 rounded-full font-medium transition-colors cursor-pointer"
+        >
+          <Trash2 className="w-5 h-5" />
+          <span>Clear Data</span>
+        </button>
+      </div>
+    </div>
+  )
+
   return (
-    <MainLayout
-      leftSidebar={
-        <div className="space-y-6 flex flex-col h-full">
-          <div className="px-6 py-4 cursor-pointer" onClick={() => navigate('/')}>
-             <h1 className="text-xl font-bold text-white">Mastodon</h1>
-             <p className="text-sm text-mastodon-text-secondary">Archive Viewer</p>
-          </div>
+    <>
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
 
-          <nav className="flex flex-col space-y-2 px-4 flex-1">
-             <button
-               onClick={() => { navigate('/'); setSelectedPostId(undefined) }}
-               className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
-             >
-               <Home className="w-6 h-6" />
-               <span className="text-lg">Home</span>
-             </button>
-
-             <button className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer">
-                <BarChart3 className="w-6 h-6" />
-                <span className="text-lg">Statistics</span>
-             </button>
-
-             <button className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer">
-                <User className="w-6 h-6" />
-                <span className="text-lg">Profile</span>
-             </button>
-
-             <button
-               onClick={() => navigate('/debug')}
-               className="flex items-center gap-4 px-4 py-3 text-gray-500 font-medium hover:bg-mastodon-surface hover:text-gray-300 transition-colors rounded-full mt-auto cursor-pointer"
-             >
-                <span className="text-lg">🛠️</span>
-                <span>Debug</span>
-             </button>
-          </nav>
-
-          <div className="px-6 pb-6">
-            <button
-               onClick={async () => {
-                 if (confirm('Are you sure you want to clear all data?')) {
-                   await db.clearAll()
-                   setHasData(false)
-                   navigate('/')
-                 }
-               }}
-               className="flex items-center justify-center gap-2 w-full py-3 text-red-500 hover:bg-red-500/10 rounded-full font-medium transition-colors cursor-pointer"
-            >
-              <Trash2 className="w-5 h-5" />
-              <span>Clear Data</span>
-            </button>
-          </div>
+      {/* Mobile Menu Drawer */}
+      <div className={`fixed top-0 left-0 h-full w-[280px] bg-mastodon-bg z-50 transform transition-transform duration-300 md:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex justify-end p-4">
+          <button onClick={() => setMobileMenuOpen(false)} className="text-white">
+            <X className="w-6 h-6" />
+          </button>
         </div>
+        {leftSidebarContent}
+      </div>
+
+
+
+      <MainLayout
+        leftSidebar={leftSidebarContent}
+        rightSidebar={
+           ['/stats', '/profile'].includes(location.pathname) ? undefined : (
+             selectedPostId ? (
+                <ThreadView
+                  postId={selectedPostId}
+                  onClose={() => setSelectedPostId(undefined)}
+              />
+           ) : (
+              <div className="flex items-center justify-center h-full text-mastodon-text-secondary">
+                 <div className="text-center p-8">
+                    <p className="mb-2">Select a post to view details</p>
+                 </div>
+              </div>
+           )
+        )
       }
-      rightSidebar={
-         selectedPostId ? (
-            <ThreadView 
-                postId={selectedPostId} 
-                onClose={() => setSelectedPostId(undefined)} 
-            />
-         ) : (
-            <div className="flex items-center justify-center h-full text-mastodon-text-secondary">
-               <div className="text-center p-8">
-                  <p className="mb-2">Select a post to view details</p>
-               </div>
-            </div>
-         )
-      }
-    >
-      <Routes>
-         <Route path="/" element={<Timeline onPostClick={(id) => setSelectedPostId(id)} />} />
-         <Route path="/debug" element={<DebugDashboard />} />
-      </Routes>
-    </MainLayout>
+      >
+        <Routes>
+           <Route path="/" element={<Timeline onPostClick={handlePostClick} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />} />
+           <Route path="/post/:id" element={<ThreadView />} />
+           <Route path="/stats" element={<StatsPage />} />
+           <Route path="/profile" element={<ProfilePage />} />
+           <Route path="/debug" element={<DebugDashboard />} />
+        </Routes>
+      </MainLayout>
+    </>
   )
 }
 

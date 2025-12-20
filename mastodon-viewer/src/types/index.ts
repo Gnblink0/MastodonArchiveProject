@@ -27,11 +27,14 @@ export interface Post {
   publishedAt: Date
   timestamp: number // Unix 时间戳（用于排序）
   tags: string[]
+  mentions: Array<{ name: string, url: string }>
   mediaIds: string[]
   inReplyTo?: string
   sensitive: boolean
+  visibility: 'public' | 'unlisted' | 'private' | 'direct'
   summary?: string // CW 警告
   boostedPostId?: string
+  originalUrl?: string
 }
 
 export interface Media {
@@ -49,6 +52,7 @@ export interface Like {
   id: string
   activityId: string
   likedPostId: string
+  targetUrl?: string 
   likedAt: Date
   postPreview?: string
 }
@@ -57,6 +61,7 @@ export interface Bookmark {
   id: string
   activityId: string
   bookmarkedPostId: string
+  targetUrl?: string
   bookmarkedAt: Date
   postPreview?: string
 }
