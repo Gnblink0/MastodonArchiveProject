@@ -149,7 +149,7 @@ function App() {
 
       </nav>
 
-      <div className="px-6 py-4 mt-auto border-t border-mastodon-border/50">
+      <div className="px-6 pt-4 pb-24 mt-auto border-t border-mastodon-border/50">
         {googleAccessToken ? (
           <>
             <div className="flex items-center justify-between py-2 text-mastodon-text-secondary text-xs mb-2">
@@ -209,13 +209,17 @@ function App() {
       )}
 
       {/* Mobile Menu Drawer */}
-      <div className={`fixed top-0 left-0 h-full w-[280px] bg-mastodon-bg z-50 transform transition-transform duration-300 md:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed top-0 left-0 h-[100dvh] w-[280px] bg-mastodon-bg z-50 transform transition-transform duration-300 md:hidden flex flex-col ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex justify-end p-4">
           <button onClick={() => setMobileMenuOpen(false)} className="text-white">
             <X className="w-6 h-6" />
           </button>
         </div>
-        {leftSidebarContent}
+        
+        {/* Render content with scrolling */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe">
+           {leftSidebarContent}
+        </div>
       </div>
 
 
