@@ -22,7 +22,8 @@ export function ProfilePage() {
   }).format(actor.createdAt)
 
   return (
-    <div className="max-w-4xl mx-auto pb-10">
+    <div className="h-full overflow-auto">
+      <div className="max-w-4xl mx-auto pb-10">
       {/* Header Banner */}
       <div className="h-48 md:h-64 bg-mastodon-surface relative overflow-hidden rounded-b-lg">
         {actor.headerUrl ? (
@@ -92,6 +93,7 @@ export function ProfilePage() {
                  If we don't have them in types, we skip. */}
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

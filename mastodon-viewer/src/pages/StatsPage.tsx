@@ -269,7 +269,7 @@ export function StatsPage() {
   const totalDays = daysDiff(dateRange.min, dateRange.max)
 
   return (
-    <div className="min-h-screen bg-[#191b22] text-[#d9e1e8] p-4 md:p-8 font-sans">
+    <div className="h-full overflow-auto bg-[#191b22] text-[#d9e1e8] p-4 md:p-8 font-sans">
       
       {/* Header & Meta */}
       <div className="bg-[#282c37] rounded-lg p-6 mb-8 text-center shadow-lg border border-[#393f4f]">

@@ -1,11 +1,13 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { PostCard } from './PostCard'
-import { usePosts, usePostsCount } from '../../hooks/usePosts'
-import { Loader2, Search as SearchIcon, X, ChevronLeft, ChevronRight, Menu } from 'lucide-react'
+import { usePostsCount } from '../../hooks/usePosts'
+import { Loader2, Search as SearchIcon, X, Menu } from 'lucide-react'
 import { db } from '../../lib/db'
 import type { Post } from '../../types'
 import Fuse from 'fuse.js'
-import ReactPaginate from 'react-paginate'
+import { useVirtualizer } from '@tanstack/react-virtual'
+import { useInfiniteScrollPosts } from '../../hooks/useInfiniteScroll'
+import { ScrollToTopButton } from './ScrollToTopButton'
 
 interface TimelineProps {
   onPostClick?: (postId: string) => void
@@ -14,18 +16,18 @@ interface TimelineProps {
 }
 
 export function Timeline({ onPostClick, setMobileMenuOpen }: TimelineProps) {
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
-  
+  // Infinite scroll for normal timeline
+  const { posts: timelinePosts, isLoading, hasMore, loadMore } = useInfiniteScrollPosts()
+  const totalCountDB = usePostsCount()
+
   // Search State
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Post[]>([])
   const [allPosts, setAllPosts] = useState<Post[]>([])
-  const [, setIsSearching] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
 
-  // Data fetching for normal timeline
-  const postsCallback = usePosts(pageSize, (page - 1) * pageSize)
-  const totalCountDB = usePostsCount()
+  // Ref for scroll container
+  const parentRef = useRef<HTMLDivElement>(null)
 
   // Load all posts for search indexing
   useEffect(() => {
@@ -59,7 +61,6 @@ export function Timeline({ onPostClick, setMobileMenuOpen }: TimelineProps) {
     setQuery('')
     setSearchResults([])
     setIsSearching(false)
-    setPage(1)
   }
 
   // Debounced Search Effect
@@ -80,44 +81,38 @@ export function Timeline({ onPostClick, setMobileMenuOpen }: TimelineProps) {
         setSearchResults(results)
       }
       setIsSearching(false)
-      setPage(1) // Reset to first page when results update
     }, 300) // 300ms debounce
 
     return () => clearTimeout(timeoutId)
   }, [query, fuse])
 
-  const handlePageClick = (event: { selected: number }) => {
-    setPage(event.selected + 1)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const handlePageSizeChange = (newSize: number) => {
-    setPageSize(newSize)
-    setPage(1) // Reset to first page when changing page size
-  }
-
   // Determine what to display
-  let displayedPosts: Post[] = []
-  let totalItems = 0
-  let isLoading = false
+  const displayedPosts = query ? searchResults : timelinePosts
 
-  if (query) {
-    // Search Mode
-    totalItems = searchResults.length
-    const start = (page - 1) * pageSize
-    const end = start + pageSize
-    displayedPosts = searchResults.slice(start, end)
-    isLoading = false // client side is instant mostly
-  } else {
-    // Normal Timeline Mode
-    displayedPosts = postsCallback || []
-    totalItems = totalCountDB || 0
-    isLoading = !postsCallback
-  }
+  // Virtual scrolling setup
+  const rowVirtualizer = useVirtualizer({
+    count: displayedPosts.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 400, // Estimated post height, will be measured automatically
+    overscan: 5, // Render 5 extra items above/below viewport for smoother scrolling
+  })
 
-  const totalPages = Math.ceil(totalItems / pageSize)
+  // Infinite scroll: detect when we're near the end
+  useEffect(() => {
+    if (query) return // Don't load more when searching
 
-  if (isLoading && !query) {
+    const virtualItems = rowVirtualizer.getVirtualItems()
+    if (virtualItems.length === 0) return
+
+    const lastItem = virtualItems[virtualItems.length - 1]
+
+    // When we're rendering the last few items, load more
+    if (lastItem && lastItem.index >= displayedPosts.length - 3 && hasMore && !isLoading) {
+      loadMore()
+    }
+  }, [rowVirtualizer.getVirtualItems(), hasMore, isLoading, loadMore, displayedPosts.length, query])
+
+  if (isLoading && displayedPosts.length === 0) {
     return (
       <div className="flex justify-center py-12">
         <Loader2 className="w-8 h-8 animate-spin text-mastodon-primary" />
@@ -126,13 +121,13 @@ export function Timeline({ onPostClick, setMobileMenuOpen }: TimelineProps) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-4">
+    <div className="h-full flex flex-col max-w-2xl mx-auto">
       {/* Search Bar and Mobile Menu Button */}
-      <div className="mb-4 flex items-center gap-2">
+      <div className="px-4 pt-4 pb-2 flex items-center gap-2">
         {/* Mobile Menu Button */}
         <button
           onClick={() => setMobileMenuOpen(true)}
-          className="md:hidden bg-mastodon-surface p-3 rounded-full text-white"
+          className="md:hidden bg-mastodon-surface p-3 rounded-full text-white cursor-pointer"
         >
           <Menu className="w-6 h-6" />
         </button>
@@ -166,77 +161,98 @@ export function Timeline({ onPostClick, setMobileMenuOpen }: TimelineProps) {
         </div>
       </div>
 
-      {/* Posts List */}
-      <div>
+      {/* Posts count indicator */}
+      {!query && totalCountDB && (
+        <div className="px-4 pb-2 text-sm text-mastodon-text-secondary text-center">
+          Loaded {displayedPosts.length} of {totalCountDB} posts
+        </div>
+      )}
+
+      {query && (
+        <div className="px-4 pb-2 text-sm text-mastodon-text-secondary text-center">
+          {isSearching ? 'Searching...' : `Found ${searchResults.length} results`}
+        </div>
+      )}
+
+      {/* Virtual Scrolling Container */}
+      <div
+        ref={parentRef}
+        className="flex-1 overflow-auto px-4"
+        style={{
+          contain: 'strict',
+        }}
+      >
         {displayedPosts.length === 0 ? (
           <div className="text-center py-12 text-mastodon-text-secondary">
             {query ? 'Try different keywords' : 'No posts in archive'}
           </div>
         ) : (
-          <>
-            {displayedPosts.map((post) => (
-              <PostCard 
-                key={post.id} 
-                post={post} 
-                highlight={query}
-                onClick={onPostClick ? () => onPostClick(post.id) : undefined}
-              />
-            ))}
-
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-                <div className="mt-4 border-t border-mastodon-border pt-4 px-4">
-                  {/* Page Size Selector */}
-                  <div className="flex items-center justify-center gap-2 mb-4">
-                    <span className="text-sm text-mastodon-text-secondary">Posts per page:</span>
-                    <select
-                      value={pageSize}
-                      onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                      className="bg-mastodon-surface text-mastodon-text-primary border border-mastodon-border rounded px-3 py-1 text-sm cursor-pointer"
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                  </div>
-
-                  {/* Pagination */}
-                  <ReactPaginate
-                      breakLabel="..."
-                      nextLabel={<ChevronRight className="w-5 h-5" />}
-                      onPageChange={handlePageClick}
-                      pageRangeDisplayed={3}
-                      pageCount={totalPages}
-                      previousLabel={<ChevronLeft className="w-5 h-5" />}
-                      forcePage={page - 1}
-                      renderOnZeroPageCount={null}
-
-                      containerClassName="flex items-center justify-center gap-2 py-4 select-none"
-
-                      pageClassName="block"
-                      pageLinkClassName="flex items-center justify-center w-8 h-8 rounded-md bg-mastodon-surface text-mastodon-text-secondary hover:bg-mastodon-primary/20 hover:text-mastodon-primary transition-colors cursor-pointer text-sm"
-
-                      activeClassName="block"
-                      activeLinkClassName="!bg-mastodon-primary !text-white hover:bg-mastodon-primary hover:text-white"
-
-                      previousClassName="mr-auto sm:mr-2"
-                      previousLinkClassName="p-2 rounded-lg bg-mastodon-surface text-white hover:bg-mastodon-border transition-colors cursor-pointer flex items-center"
-
-                      nextClassName="ml-auto sm:ml-2"
-                      nextLinkClassName="p-2 rounded-lg bg-mastodon-surface text-white hover:bg-mastodon-border transition-colors cursor-pointer flex items-center"
-
-                      disabledClassName="opacity-50 cursor-not-allowed"
-                      disabledLinkClassName="cursor-not-allowed hover:bg-mastodon-surface"
-
-                      breakClassName="flex items-center justify-center w-8 h-8 text-mastodon-text-secondary"
-                      breakLinkClassName="block w-full h-full text-center leading-8"
+          <div
+            style={{
+              height: `${rowVirtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualItem) => {
+              const post = displayedPosts[virtualItem.index]
+              return (
+                <div
+                  key={virtualItem.key}
+                  data-index={virtualItem.index}
+                  ref={rowVirtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }}
+                >
+                  <PostCard
+                    post={post}
+                    highlight={query}
+                    onClick={onPostClick ? () => onPostClick(post.id) : undefined}
                   />
                 </div>
+              )
+            })}
+
+            {/* Loading indicator at the bottom */}
+            {!query && isLoading && hasMore && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: `${rowVirtualizer.getTotalSize()}px`,
+                  left: 0,
+                  width: '100%',
+                }}
+                className="flex justify-center py-8"
+              >
+                <Loader2 className="w-6 h-6 animate-spin text-mastodon-primary" />
+              </div>
             )}
-          </>
+
+            {/* End of timeline indicator */}
+            {!query && !hasMore && displayedPosts.length > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: `${rowVirtualizer.getTotalSize()}px`,
+                  left: 0,
+                  width: '100%',
+                }}
+                className="text-center py-8 text-mastodon-text-secondary text-sm"
+              >
+                You've reached the end of your timeline
+              </div>
+            )}
+          </div>
         )}
       </div>
+
+      {/* Scroll to Top Button */}
+      <ScrollToTopButton scrollElement={parentRef.current} />
     </div>
   )
 }

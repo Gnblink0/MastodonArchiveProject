@@ -149,22 +149,22 @@ function App() {
 
       </nav>
 
-      <div className="px-6 pb-6 mt-auto sticky bottom-0 bg-mastodon-bg z-10 border-t border-mastodon-border">
+      <div className="px-6 py-4 mt-auto border-t border-mastodon-border/50">
         {googleAccessToken ? (
           <>
-            <div className="flex items-center justify-between py-2 text-mastodon-text-secondary text-sm">
-              <span>Logged in as {googleUser?.name || 'User'}</span>
+            <div className="flex items-center justify-between py-2 text-mastodon-text-secondary text-xs mb-2">
+              <span className="truncate">Logged in as {googleUser?.name || 'User'}</span>
               <button
                 onClick={handleLogout}
-                className="text-red-400 hover:text-red-300 flex items-center gap-1.5"
+                className="text-red-400 hover:text-red-300 flex items-center gap-1.5 cursor-pointer ml-2"
               >
-                <LogOut className="w-4 h-4" />
-                <span>Logout</span>
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="text-xs">Logout</span>
               </button>
             </div>
             <button
               onClick={() => console.log('Upload to Drive')} // TODO: Implement upload
-              className="flex items-center justify-center gap-2 w-full py-2 mb-2 text-mastodon-primary hover:text-mastodon-primary/80 hover:bg-white/5 rounded-lg text-sm transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-2 w-full py-2.5 mb-2 text-mastodon-primary hover:text-mastodon-primary/80 hover:bg-white/5 rounded-lg text-sm transition-colors cursor-pointer"
             >
               <Cloud className="w-4 h-4" />
               <span>Sync to Drive</span>
@@ -173,7 +173,7 @@ function App() {
         ) : (
           <button
             onClick={() => googleLogin()}
-            className="flex items-center justify-center gap-2 w-full py-2 mb-2 text-mastodon-primary hover:text-mastodon-primary/80 hover:bg-white/5 rounded-lg text-sm transition-colors cursor-pointer"
+            className="flex items-center justify-center gap-2 w-full py-2.5 mb-2 text-mastodon-primary hover:text-mastodon-primary/80 hover:bg-white/5 rounded-lg text-sm transition-colors cursor-pointer"
           >
             <LogIn className="w-4 h-4" />
             <span>Login with Google</span>
@@ -189,7 +189,7 @@ function App() {
                setMobileMenuOpen(false)
              }
            }}
-           className="flex items-center justify-center gap-2 w-full py-2 text-mastodon-text-tertiary hover:text-red-400 hover:bg-white/5 rounded-lg text-sm transition-colors cursor-pointer"
+           className="flex items-center justify-center gap-2 w-full py-2.5 text-mastodon-text-tertiary hover:text-red-400 hover:bg-white/5 rounded-lg text-sm transition-colors cursor-pointer"
         >
           <Trash2 className="w-4 h-4" />
           <span>Clear Data</span>

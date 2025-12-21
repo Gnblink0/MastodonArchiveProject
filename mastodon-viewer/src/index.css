@@ -9,21 +9,28 @@ body {
   color: theme('colors.mastodon.text.primary');
 }
 
-/* Custom Scrollbar for Webkit */
+/* Apple-style Custom Scrollbar for Webkit */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: theme('colors.mastodon.bg');
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: theme('colors.mastodon.surface');
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  transition: background 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: theme('colors.mastodon.text.secondary');
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
