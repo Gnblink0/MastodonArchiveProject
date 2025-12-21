@@ -194,7 +194,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
 
             // Combine all chunks into a single blob
             setDriveStatus('Combining chunks...')
-            const combinedBlob = new Blob(chunks)
+            const combinedBlob = new Blob(chunks as any)
             setUploadProgress(100)
             resolve(combinedBlob)
 
