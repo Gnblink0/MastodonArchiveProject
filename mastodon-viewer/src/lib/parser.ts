@@ -580,7 +580,7 @@ export class ArchiveParser {
     bookmarks: Bookmark[],
     media: Media[]
   ) {
-    this.reportProgress('保存到数据库', 0, 100)
+    this.reportProgress('准备保存...', 0, 100)
 
     // 过滤掉无效 ID 并去重
     const validPosts = posts.filter(p => p.id && typeof p.id === 'string')
@@ -595,35 +595,53 @@ export class ArchiveParser {
     const validBookmarks = bookmarks.filter(b => b.id && typeof b.id === 'string')
     const validMedia = media.filter(m => m.id && typeof m.id === 'string')
 
+    // 1. 清空旧数据
+    this.reportProgress('清空旧数据...', 0, 100)
     await db.transaction('rw', [db.actor, db.posts, db.likes, db.bookmarks, db.media], async () => {
-      // 清空旧数据
       await db.actor.clear()
       await db.posts.clear()
       await db.likes.clear()
       await db.bookmarks.clear()
       await db.media.clear()
-
-      // 使用 bulkPut 代替 bulkAdd，这样会覆盖而不是报错
+      
+      // 保存用户信息
       await db.actor.put(actor)
-
-      if (uniquePosts.length > 0) {
-        await db.posts.bulkPut(uniquePosts)
-      }
-
-      if (validLikes.length > 0) {
-        await db.likes.bulkPut(validLikes)
-      }
-
-      if (validBookmarks.length > 0) {
-        await db.bookmarks.bulkPut(validBookmarks)
-      }
-
-      if (validMedia.length > 0) {
-        await db.media.bulkPut(validMedia)
-      }
     })
 
-    this.reportProgress('保存到数据库', 100, 100)
+    // 2. 分批保存帖子
+    const POST_BATCH_SIZE = 2000
+    for (let i = 0; i < uniquePosts.length; i += POST_BATCH_SIZE) {
+      const batch = uniquePosts.slice(i, i + POST_BATCH_SIZE)
+      await db.posts.bulkPut(batch)
+      this.reportProgress('正在保存帖子...', Math.min(i + batch.length, uniquePosts.length), uniquePosts.length)
+    }
+
+    // 3. 分批保存媒体文件
+    // 媒体文件包含 Blob，需要更小的批次以避免内存问题
+    const MEDIA_BATCH_SIZE = 50
+    for (let i = 0; i < validMedia.length; i += MEDIA_BATCH_SIZE) {
+      const batch = validMedia.slice(i, i + MEDIA_BATCH_SIZE)
+      await db.media.bulkPut(batch)
+      this.reportProgress('正在保存媒体文件...', Math.min(i + batch.length, validMedia.length), validMedia.length)
+    }
+
+    // 4. 分批保存点赞
+    const LIKE_BATCH_SIZE = 5000
+    for (let i = 0; i < validLikes.length; i += LIKE_BATCH_SIZE) {
+      const batch = validLikes.slice(i, i + LIKE_BATCH_SIZE)
+      await db.likes.bulkPut(batch)
+      this.reportProgress('正在保存点赞...', Math.min(i + batch.length, validLikes.length), validLikes.length)
+    }
+
+    // 5. 分批保存书签
+    const BOOKMARK_BATCH_SIZE = 5000
+    for (let i = 0; i < validBookmarks.length; i += BOOKMARK_BATCH_SIZE) {
+      const batch = validBookmarks.slice(i, i + BOOKMARK_BATCH_SIZE)
+      await db.bookmarks.bulkPut(batch)
+      this.reportProgress('正在保存书签...', Math.min(i + batch.length, validBookmarks.length), validBookmarks.length)
+    }
+
+    this.reportProgress('保存完成', 100, 100)
   }
 
   private stripHtml(html: string): string {
