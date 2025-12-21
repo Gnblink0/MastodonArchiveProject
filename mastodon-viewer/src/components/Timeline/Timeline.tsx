@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react'
 import { PostCard } from './PostCard'
 import { usePostsCount } from '../../hooks/usePosts'
-import { Loader2, Search as SearchIcon, X, Menu, Calendar } from 'lucide-react'
+import { Loader2, Search as SearchIcon, X, Menu, Calendar, ArrowDown } from 'lucide-react'
 import { db } from '../../lib/db'
 import type { Post } from '../../types'
 import Fuse from 'fuse.js'
@@ -33,7 +33,15 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
   const [jumpedPosts, setJumpedPosts] = useState<Post[] | null>(null)
   const [isLoadingJumped, setIsLoadingJumped] = useState(false)
 
+  // Pull-to-refresh states
+  const [pullState, setPullState] = useState<'idle' | 'pulling' | 'ready' | 'refreshing'>('idle')
+  const [pullDistance, setPullDistance] = useState(0)
+
   const parentRef = useRef<HTMLDivElement>(null)
+  const touchStartY = useRef<number>(0)
+  const currentTouchY = useRef<number>(0)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const pendingScrollToPost = useRef<string | null>(null) // Store post ID to scroll to
 
   // --- Derived State (must be before virtualizer) ---
   const displayedPosts = query ? searchResults : (jumpedPosts || timelinePosts)
@@ -46,7 +54,72 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
     overscan: 5, // Render 5 extra items above/below viewport for smoother scrolling
   })
 
+  // --- Event Handlers (defined before useEffect to avoid initialization errors) ---
+
+  // Load newer posts in jumped mode (triggered by pull-to-refresh)
+  const loadNewerPosts = useCallback(async () => {
+    if (!jumpedPosts || isLoadingJumped || pullState === 'refreshing') return
+
+    setPullState('refreshing')
+    setIsLoadingJumped(true)
+
+    try {
+      // Minimum delay to show loading animation
+      await new Promise(resolve => setTimeout(resolve, 800))
+
+      const newestPost = jumpedPosts[0]
+      const newerPosts = await db.posts
+        .where('timestamp')
+        .above(newestPost.timestamp)
+        .limit(20)
+        .toArray()
+
+      if (newerPosts.length > 0) {
+        // Remember the first visible post to restore scroll position
+        const virtualItems = rowVirtualizer.getVirtualItems()
+        const firstVisiblePost = virtualItems.length > 0 ? jumpedPosts[virtualItems[0].index] : null
+
+        // Store the post ID to scroll to after render
+        if (firstVisiblePost) {
+          pendingScrollToPost.current = firstVisiblePost.id
+        }
+
+        const sortedNewer = [...newerPosts].sort((a, b) => b.timestamp - a.timestamp)
+        const newCombinedPosts = [...sortedNewer, ...jumpedPosts]
+
+        setJumpedPosts(newCombinedPosts)
+      }
+    } catch (error) {
+      console.error('Failed to load newer jumped posts:', error)
+    } finally {
+      setIsLoadingJumped(false)
+      // Reset pull state after animation
+      setTimeout(() => {
+        setPullState('idle')
+        setPullDistance(0)
+      }, 300)
+    }
+  }, [jumpedPosts, isLoadingJumped, pullState, rowVirtualizer])
+
   // --- Effects ---
+
+  // Effect to restore scroll position after loading newer posts
+  // Use useLayoutEffect to execute before browser paint, avoiding flicker
+  useLayoutEffect(() => {
+    if (pendingScrollToPost.current && displayedPosts.length > 0) {
+      const postId = pendingScrollToPost.current
+      const targetIndex = displayedPosts.findIndex(p => p.id === postId)
+
+      if (targetIndex >= 0) {
+        // Scroll immediately without delay
+        rowVirtualizer.scrollToIndex(targetIndex, {
+          align: 'start',
+          behavior: 'auto'
+        })
+        pendingScrollToPost.current = null
+      }
+    }
+  }, [displayedPosts, rowVirtualizer])
 
   // Effect to scroll to a specific index when requested from parent (App.tsx)
   useEffect(() => {
@@ -114,11 +187,6 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
 
     const virtualItems = rowVirtualizer.getVirtualItems()
     if (virtualItems.length === 0) return
-
-    // Check for upward scroll (Load newer posts)
-    if (jumpedPosts && !isLoadingJumped && parentRef.current && parentRef.current.scrollTop < 50) {
-      loadNewerPosts()
-    }
 
     const lastItem = virtualItems[virtualItems.length - 1]
 
@@ -190,8 +258,115 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
     }
   }, [displayedPosts, rowVirtualizer])
 
+  // Pull-to-refresh for loading newer posts in jumped mode
+  useEffect(() => {
+    if (!jumpedPosts) return // Only in jumped mode
 
-  // --- Event Handlers ---
+    const scrollElement = parentRef.current
+    if (!scrollElement) return
+
+    const PULL_THRESHOLD = 70 // Threshold to trigger refresh (in px)
+    const MAX_PULL = 120 // Maximum pull distance
+
+    const handleTouchStart = (e: TouchEvent) => {
+      // Only start tracking if at the top of scroll
+      if (scrollElement.scrollTop === 0 && pullState === 'idle') {
+        touchStartY.current = e.touches[0].clientY
+        currentTouchY.current = touchStartY.current
+      }
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      // If user scrolled away from top while in pull state, reset
+      if (scrollElement.scrollTop > 0 && (pullState === 'pulling' || pullState === 'ready')) {
+        setPullState('idle')
+        setPullDistance(0)
+        touchStartY.current = 0
+        currentTouchY.current = 0
+        return
+      }
+
+      // Ignore if not at top, already refreshing, or no touch start recorded
+      if (scrollElement.scrollTop > 0 || pullState === 'refreshing' || touchStartY.current === 0) {
+        return
+      }
+
+      currentTouchY.current = e.touches[0].clientY
+      const diff = currentTouchY.current - touchStartY.current
+
+      // Only respond to downward pull
+      if (diff > 0) {
+        // Prevent default scroll behavior when pulling down
+        if (scrollElement.scrollTop === 0) {
+          e.preventDefault()
+        }
+
+        // Apply resistance curve: harder to pull as distance increases
+        const resistance = 0.5
+        const distance = Math.min(diff * resistance, MAX_PULL)
+
+        setPullDistance(distance)
+
+        // Update state based on distance
+        if (distance >= PULL_THRESHOLD) {
+          setPullState('ready')
+        } else if (distance > 0) {
+          setPullState('pulling')
+        }
+      }
+    }
+
+    const handleTouchEnd = () => {
+      // Always reset touch tracking first
+      const wasTracking = touchStartY.current !== 0
+      const diff = currentTouchY.current - touchStartY.current
+
+      // Reset touch tracking immediately
+      touchStartY.current = 0
+      currentTouchY.current = 0
+
+      // Only process if we were actually tracking a pull
+      if (!wasTracking) return
+
+      const resistance = 0.5
+      const distance = Math.min(diff * resistance, MAX_PULL)
+
+      // Trigger refresh if pulled beyond threshold
+      if (distance >= PULL_THRESHOLD && pullState === 'ready') {
+        loadNewerPosts()
+      } else {
+        // Reset if not pulled enough
+        setPullState('idle')
+        setPullDistance(0)
+      }
+    }
+
+    const handleTouchCancel = () => {
+      // Force reset everything when touch is cancelled
+      touchStartY.current = 0
+      currentTouchY.current = 0
+      if (pullState !== 'refreshing') {
+        setPullState('idle')
+        setPullDistance(0)
+      }
+    }
+
+    // Use passive: false to allow preventDefault
+    scrollElement.addEventListener('touchstart', handleTouchStart, { passive: true })
+    scrollElement.addEventListener('touchmove', handleTouchMove, { passive: false })
+    scrollElement.addEventListener('touchend', handleTouchEnd, { passive: true })
+    scrollElement.addEventListener('touchcancel', handleTouchCancel, { passive: true })
+
+    return () => {
+      scrollElement.removeEventListener('touchstart', handleTouchStart)
+      scrollElement.removeEventListener('touchmove', handleTouchMove)
+      scrollElement.removeEventListener('touchend', handleTouchEnd)
+      scrollElement.removeEventListener('touchcancel', handleTouchCancel)
+    }
+  }, [jumpedPosts, pullState, loadNewerPosts])
+
+
+  // --- Additional Event Handlers ---
 
   const handleSearch = (val: string) => {
     setQuery(val)
@@ -205,44 +380,6 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
     setJumpedPosts(null)
   }
 
-  // Load newer posts in jumped mode (manual trigger or scroll to top)
-  const loadNewerPosts = async () => {
-    if (!jumpedPosts || isLoadingJumped) return
-
-    setIsLoadingJumped(true)
-    await new Promise(resolve => setTimeout(resolve, 800)) // Artificial delay
-
-    try {
-      const newestPost = jumpedPosts[0]
-      const newerPosts = await db.posts
-        .where('timestamp')
-        .above(newestPost.timestamp)
-        .limit(20)
-        .toArray()
-
-      if (newerPosts.length > 0) {
-        const scrollContainer = parentRef.current
-        const previousScrollHeight = scrollContainer?.scrollHeight || 0
-        const previousScrollTop = scrollContainer?.scrollTop || 0
-        
-        const sortedNewer = [...newerPosts].sort((a, b) => b.timestamp - a.timestamp)
-        setJumpedPosts(prev => prev ? [...sortedNewer, ...prev] : sortedNewer)
-
-        requestAnimationFrame(() => {
-          if (scrollContainer) {
-            const newScrollHeight = scrollContainer.scrollHeight
-            const heightDifference = newScrollHeight - previousScrollHeight
-            scrollContainer.scrollTop = previousScrollTop + heightDifference
-          }
-        })
-      }
-    } catch (error) {
-      console.error('Failed to load newer jumped posts:', error)
-    } finally {
-      setIsLoadingJumped(false)
-    }
-  }
-
   // Handle month click from timeline drawer
   const handleMonthClick = async (year: number, month: number) => {
     if (query) {
@@ -251,18 +388,22 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
       setIsSearching(false)
     }
 
+    const monthStart = new Date(year, month, 1).getTime()
     const nextMonthStart = new Date(year, month + 1, 1).getTime()
 
     try {
-      const newPosts = await db.posts
+      // Get posts from this month, sorted by newest first
+      const monthPosts = await db.posts
         .where('timestamp')
-        .below(nextMonthStart) // Strictly less than the first moment of next month
-        .reverse()
-        .limit(30)
+        .between(monthStart, nextMonthStart, true, false) // [monthStart, nextMonthStart)
         .toArray()
 
-      if (newPosts.length > 0) {
-        const sortedPosts = [...newPosts].sort((a, b) => b.timestamp - a.timestamp)
+      if (monthPosts.length > 0) {
+        // Sort by timestamp descending (newest first) and take first 30
+        const sortedPosts = [...monthPosts]
+          .sort((a, b) => b.timestamp - a.timestamp)
+          .slice(0, 30)
+
         setJumpedPosts(sortedPosts)
 
         // Give React a moment to render the new posts into the virtualizer
@@ -334,7 +475,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
         <button
           onClick={() => setTimelineDrawerOpen(true)}
           className="bg-mastodon-surface p-3 rounded-full text-white hover:bg-mastodon-surface/80 transition-colors"
-          aria-label="打开时间轴导航"
+          aria-label="Open timeline navigation"
         >
           <Calendar className="w-6 h-6" />
         </button>
@@ -368,11 +509,48 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
       {/* Virtual Scrolling Container */}
       <div
         ref={parentRef}
-        className="flex-1 overflow-auto px-4"
+        className="flex-1 overflow-auto px-4 relative"
         style={{
           contain: 'strict',
         }}
       >
+        {/* Pull-to-refresh indicator - positioned above the content */}
+        {jumpedPosts && pullState !== 'idle' && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              width: '100%',
+              height: '60px',
+              zIndex: 50,
+            }}
+            className="flex justify-center items-center"
+          >
+            <div className="flex items-center gap-2 text-mastodon-primary bg-mastodon-surface/90 backdrop-blur-sm rounded-lg px-4 py-2">
+              {pullState === 'refreshing' ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm font-medium">Loading...</span>
+                </>
+              ) : pullState === 'ready' ? (
+                <>
+                  <ArrowDown
+                    className="w-5 h-5 transition-transform duration-200"
+                    style={{ transform: 'rotate(180deg)' }}
+                  />
+                  <span className="text-sm font-medium">Release to refresh</span>
+                </>
+              ) : (
+                <>
+                  <ArrowDown className="w-5 h-5 transition-transform duration-200" />
+                  <span className="text-sm font-medium">Pull to refresh</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {displayedPosts.length === 0 ? (
           <div className="text-center py-12 text-mastodon-text-secondary">
             {query ? 'Try different keywords' : 'No posts in archive'}
@@ -383,27 +561,12 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
               height: `${rowVirtualizer.getTotalSize()}px`,
               width: '100%',
               position: 'relative',
+              transform: `translateY(${pullDistance}px)`,
+              transition: pullState === 'idle' || pullState === 'refreshing'
+                ? 'transform 0.3s ease-out'
+                : 'none',
             }}
           >
-            {/* Loading indicator at the top (for scroll up in jumped mode) */}
-            {/* Loading indicator at the top (for scroll up in jumped mode) */}
-            {jumpedPosts && isLoadingJumped && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  zIndex: 50,
-                }}
-                className="flex justify-center py-4 bg-mastodon-surface/90 backdrop-blur-sm shadow-md transition-all duration-300"
-              >
-                <div className="flex items-center gap-2 text-mastodon-primary">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span className="text-sm font-medium">Loading previous posts...</span>
-                </div>
-              </div>
-            )}
 
             {rowVirtualizer.getVirtualItems().map((virtualItem) => {
               const post = displayedPosts[virtualItem.index]

@@ -4,45 +4,48 @@ import { db } from '../lib/db'
 
 export interface TimelineMonth {
   month: number // 0-11 (Date.getMonth())
-  monthLabel: string // "11月"
+  monthLabel: string // "Nov"
   count: number
-  latestPostTimestamp: number // 该月最新的帖子时间戳（用于跳转）
+  latestPostTimestamp: number // Latest post timestamp in this month (for jumping)
   monthKey: string // "2023-11" for matching
 }
 
 export interface TimelineYear {
   year: number
-  yearLabel: string // "2021年"
+  yearLabel: string // "2021"
   months: TimelineMonth[]
 }
 
 export function useTimelineIndex(): TimelineYear[] {
-  // 查询所有帖子
+  // Query all posts
   const allPosts = useLiveQuery(() => db.posts.toArray(), [])
 
-  // 按年月分组
+  // Group by year and month
   const timelineIndex = useMemo(() => {
     if (!allPosts || allPosts.length === 0) {
       return []
     }
 
-    // 使用 Map 来组织数据: year -> month -> { count, latestTimestamp }
+    // Month names in English
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+    // Use Map to organize data: year -> month -> { count, latestTimestamp }
     const yearMonthMap = new Map<number, Map<number, { count: number; latestTimestamp: number }>>()
 
-    // 遍历所有帖子
+    // Iterate through all posts
     allPosts.forEach(post => {
       const date = new Date(post.publishedAt)
       const year = date.getFullYear()
       const month = date.getMonth() // 0-11
 
-      // 初始化年份
+      // Initialize year
       if (!yearMonthMap.has(year)) {
         yearMonthMap.set(year, new Map())
       }
 
       const monthMap = yearMonthMap.get(year)!
 
-      // 初始化月份
+      // Initialize month
       if (!monthMap.has(month)) {
         monthMap.set(month, {
           count: 0,
@@ -53,32 +56,32 @@ export function useTimelineIndex(): TimelineYear[] {
       const monthData = monthMap.get(month)!
       monthData.count++
 
-      // 保持最新的帖子时间戳（最大的时间戳）
+      // Keep the latest post timestamp (maximum timestamp)
       if (post.timestamp > monthData.latestTimestamp) {
         monthData.latestTimestamp = post.timestamp
       }
     })
 
-    // 转换为数组结构并排序
+    // Convert to array structure and sort
     const result: TimelineYear[] = Array.from(yearMonthMap.entries())
       .map(([year, monthMap]) => {
         const months: TimelineMonth[] = Array.from(monthMap.entries())
           .map(([month, data]) => ({
             month,
-            monthLabel: `${month + 1}月`, // 1月, 2月, ..., 12月
+            monthLabel: monthNames[month], // Jan, Feb, ..., Dec
             count: data.count,
             latestPostTimestamp: data.latestTimestamp,
             monthKey: `${year}-${String(month + 1).padStart(2, '0')}` // "2023-01"
           }))
-          .sort((a, b) => b.month - a.month) // 月份降序（12月在前）
+          .sort((a, b) => b.month - a.month) // Sort months descending (Dec first)
 
         return {
           year,
-          yearLabel: `${year}年`,
+          yearLabel: `${year}`,
           months
         }
       })
-      .sort((a, b) => b.year - a.year) // 年份降序（最新年份在前）
+      .sort((a, b) => b.year - a.year) // Sort years descending (most recent first)
 
     return result
   }, [allPosts])
