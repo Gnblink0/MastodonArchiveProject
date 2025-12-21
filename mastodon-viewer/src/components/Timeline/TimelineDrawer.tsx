@@ -27,7 +27,7 @@ export function TimelineDrawer({ isOpen, onClose, onMonthSelect, currentMonth }:
       {/* Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40"
+          className="fixed inset-0 bg-black/50 z-40 cursor-pointer"
           onClick={onClose}
         />
       )}
@@ -43,7 +43,7 @@ export function TimelineDrawer({ isOpen, onClose, onMonthSelect, currentMonth }:
           <h2 className="text-xl font-semibold text-white">Timeline</h2>
           <button
             onClick={onClose}
-            className="text-mastodon-text-secondary hover:text-white transition-colors"
+            className="text-mastodon-text-secondary hover:text-white transition-colors cursor-pointer"
             aria-label="Close timeline"
           >
             <X className="w-6 h-6" />
@@ -73,7 +73,7 @@ export function TimelineDrawer({ isOpen, onClose, onMonthSelect, currentMonth }:
                       <button
                         key={month.monthKey}
                         onClick={() => handleMonthClick(yearData.year, month.month)}
-                        className={`w-full px-4 py-3 flex items-center justify-between hover:bg-mastodon-surface/50 transition-colors ${
+                        className={`w-full px-4 py-3 flex items-center justify-between hover:bg-mastodon-surface/50 transition-colors cursor-pointer ${
                           isCurrentMonth
                             ? 'bg-mastodon-primary/10 border-l-4 border-mastodon-primary'
                             : 'border-l-4 border-transparent'

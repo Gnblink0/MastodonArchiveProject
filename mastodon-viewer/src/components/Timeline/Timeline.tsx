@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react'
 import { PostCard } from './PostCard'
 import { usePostsCount } from '../../hooks/usePosts'
-import { Loader2, Search as SearchIcon, X, Menu, Calendar, ArrowDown } from 'lucide-react'
+import { Loader2, Search as SearchIcon, X, Menu, Calendar } from 'lucide-react'
 import { db } from '../../lib/db'
 import type { Post } from '../../types'
 import Fuse from 'fuse.js'
@@ -34,13 +34,13 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
   const [isLoadingJumped, setIsLoadingJumped] = useState(false)
 
   // Pull-to-refresh states
-  const [pullState, setPullState] = useState<'idle' | 'pulling' | 'ready' | 'refreshing'>('idle')
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [pullDistance, setPullDistance] = useState(0)
+  const [isAtTop, setIsAtTop] = useState(true) // Track if scrolled to top
 
   const parentRef = useRef<HTMLDivElement>(null)
   const touchStartY = useRef<number>(0)
   const currentTouchY = useRef<number>(0)
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pendingScrollToPost = useRef<string | null>(null) // Store post ID to scroll to
 
   // --- Derived State (must be before virtualizer) ---
@@ -58,9 +58,9 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
 
   // Load newer posts in jumped mode (triggered by pull-to-refresh)
   const loadNewerPosts = useCallback(async () => {
-    if (!jumpedPosts || isLoadingJumped || pullState === 'refreshing') return
+    if (!jumpedPosts || isLoadingJumped || isRefreshing) return
 
-    setPullState('refreshing')
+    setIsRefreshing(true)
     setIsLoadingJumped(true)
 
     try {
@@ -93,13 +93,13 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
       console.error('Failed to load newer jumped posts:', error)
     } finally {
       setIsLoadingJumped(false)
-      // Reset pull state after animation
+      // Reset refresh state after animation
       setTimeout(() => {
-        setPullState('idle')
+        setIsRefreshing(false)
         setPullDistance(0)
       }, 300)
     }
-  }, [jumpedPosts, isLoadingJumped, pullState, rowVirtualizer])
+  }, [jumpedPosts, isLoadingJumped, isRefreshing, rowVirtualizer])
 
   // --- Effects ---
 
@@ -225,11 +225,17 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
     }
   }, [rowVirtualizer.getVirtualItems(), hasMore, isLoading, loadMore, displayedPosts.length, query, jumpedPosts, isLoadingJumped])
 
-  // Track current visible month for highlighting
+  // Track current visible month for highlighting and scroll position
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>
 
     const handleScroll = () => {
+      const scrollElement = parentRef.current
+      if (!scrollElement) return
+
+      // Update isAtTop state
+      setIsAtTop(scrollElement.scrollTop === 0)
+
       clearTimeout(timeoutId)
       timeoutId = setTimeout(() => {
         const virtualItems = rowVirtualizer.getVirtualItems()
@@ -258,28 +264,28 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
     }
   }, [displayedPosts, rowVirtualizer])
 
-  // Pull-to-refresh for loading newer posts in jumped mode
+  // Pull-to-refresh for loading newer posts in jumped mode (mobile only)
   useEffect(() => {
     if (!jumpedPosts) return // Only in jumped mode
 
     const scrollElement = parentRef.current
     if (!scrollElement) return
 
-    const PULL_THRESHOLD = 70 // Threshold to trigger refresh (in px)
+    const PULL_THRESHOLD = 80 // Threshold to trigger refresh (in px)
     const MAX_PULL = 120 // Maximum pull distance
 
+    // Touch event handlers for mobile
     const handleTouchStart = (e: TouchEvent) => {
       // Only start tracking if at the top of scroll
-      if (scrollElement.scrollTop === 0 && pullState === 'idle') {
+      if (scrollElement.scrollTop === 0 && !isRefreshing) {
         touchStartY.current = e.touches[0].clientY
         currentTouchY.current = touchStartY.current
       }
     }
 
     const handleTouchMove = (e: TouchEvent) => {
-      // If user scrolled away from top while in pull state, reset
-      if (scrollElement.scrollTop > 0 && (pullState === 'pulling' || pullState === 'ready')) {
-        setPullState('idle')
+      // If user scrolled away from top, reset
+      if (scrollElement.scrollTop > 0) {
         setPullDistance(0)
         touchStartY.current = 0
         currentTouchY.current = 0
@@ -287,14 +293,14 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
       }
 
       // Ignore if not at top, already refreshing, or no touch start recorded
-      if (scrollElement.scrollTop > 0 || pullState === 'refreshing' || touchStartY.current === 0) {
+      if (scrollElement.scrollTop > 0 || isRefreshing || touchStartY.current === 0) {
         return
       }
 
       currentTouchY.current = e.touches[0].clientY
       const diff = currentTouchY.current - touchStartY.current
 
-      // Only respond to downward pull
+      // Only respond to downward pull (diff > 0 means finger moving down)
       if (diff > 0) {
         // Prevent default scroll behavior when pulling down
         if (scrollElement.scrollTop === 0) {
@@ -306,13 +312,6 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
         const distance = Math.min(diff * resistance, MAX_PULL)
 
         setPullDistance(distance)
-
-        // Update state based on distance
-        if (distance >= PULL_THRESHOLD) {
-          setPullState('ready')
-        } else if (distance > 0) {
-          setPullState('pulling')
-        }
       }
     }
 
@@ -332,11 +331,10 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
       const distance = Math.min(diff * resistance, MAX_PULL)
 
       // Trigger refresh if pulled beyond threshold
-      if (distance >= PULL_THRESHOLD && pullState === 'ready') {
+      if (distance >= PULL_THRESHOLD) {
         loadNewerPosts()
       } else {
         // Reset if not pulled enough
-        setPullState('idle')
         setPullDistance(0)
       }
     }
@@ -345,13 +343,12 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
       // Force reset everything when touch is cancelled
       touchStartY.current = 0
       currentTouchY.current = 0
-      if (pullState !== 'refreshing') {
-        setPullState('idle')
+      if (!isRefreshing) {
         setPullDistance(0)
       }
     }
 
-    // Use passive: false to allow preventDefault
+    // Add touch event listeners for mobile only
     scrollElement.addEventListener('touchstart', handleTouchStart, { passive: true })
     scrollElement.addEventListener('touchmove', handleTouchMove, { passive: false })
     scrollElement.addEventListener('touchend', handleTouchEnd, { passive: true })
@@ -363,7 +360,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
       scrollElement.removeEventListener('touchend', handleTouchEnd)
       scrollElement.removeEventListener('touchcancel', handleTouchCancel)
     }
-  }, [jumpedPosts, pullState, loadNewerPosts])
+  }, [jumpedPosts, isRefreshing, loadNewerPosts])
 
 
   // --- Additional Event Handlers ---
@@ -474,7 +471,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
         {/* Timeline Navigation Button */}
         <button
           onClick={() => setTimelineDrawerOpen(true)}
-          className="bg-mastodon-surface p-3 rounded-full text-white hover:bg-mastodon-surface/80 transition-colors"
+          className="bg-mastodon-surface p-3 rounded-full text-white hover:bg-mastodon-surface/80 transition-colors cursor-pointer"
           aria-label="Open timeline navigation"
         >
           <Calendar className="w-6 h-6" />
@@ -489,14 +486,36 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
       )}
 
       {jumpedPosts && !query && (
-        <div className="px-4 pb-2 text-sm text-mastodon-text-secondary text-center">
-          Viewing {displayedPosts.length} posts from selected month
-          <button
-            onClick={() => setJumpedPosts(null)}
-            className="ml-2 text-mastodon-primary hover:underline"
-          >
-            Return to timeline
-          </button>
+        <div className="px-4 pb-2 space-y-2">
+          {/* Load more button for desktop - only show when at top */}
+          {isAtTop && (
+            <div className="hidden md:flex justify-center">
+              <button
+                onClick={loadNewerPosts}
+                disabled={isLoadingJumped || isRefreshing}
+                className="px-4 py-2 text-sm text-mastodon-primary hover:text-mastodon-primary-hover disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors flex items-center gap-2 border border-mastodon-border hover:border-mastodon-primary rounded-lg"
+              >
+                {isLoadingJumped || isRefreshing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Loading...</span>
+                  </>
+                ) : (
+                  <span>Load earlier posts</span>
+                )}
+              </button>
+            </div>
+          )}
+
+          <div className="text-sm text-mastodon-text-secondary text-center">
+            Viewing {displayedPosts.length} posts from selected month
+            <button
+              onClick={() => setJumpedPosts(null)}
+              className="ml-2 text-mastodon-primary hover:underline cursor-pointer"
+            >
+              Return to timeline
+            </button>
+          </div>
         </div>
       )}
 
@@ -514,8 +533,8 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
           contain: 'strict',
         }}
       >
-        {/* Pull-to-refresh indicator - positioned above the content */}
-        {jumpedPosts && pullState !== 'idle' && (
+        {/* Pull-to-refresh indicator - positioned above the content (mobile only) */}
+        {jumpedPosts && pullDistance > 0 && (
           <div
             style={{
               position: 'absolute',
@@ -525,28 +544,10 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
               height: '60px',
               zIndex: 50,
             }}
-            className="flex justify-center items-center"
+            className="flex justify-center items-center md:hidden"
           >
             <div className="flex items-center gap-2 text-mastodon-primary bg-mastodon-surface/90 backdrop-blur-sm rounded-lg px-4 py-2">
-              {pullState === 'refreshing' ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span className="text-sm font-medium">Loading...</span>
-                </>
-              ) : pullState === 'ready' ? (
-                <>
-                  <ArrowDown
-                    className="w-5 h-5 transition-transform duration-200"
-                    style={{ transform: 'rotate(180deg)' }}
-                  />
-                  <span className="text-sm font-medium">Release to refresh</span>
-                </>
-              ) : (
-                <>
-                  <ArrowDown className="w-5 h-5 transition-transform duration-200" />
-                  <span className="text-sm font-medium">Pull to refresh</span>
-                </>
-              )}
+              <Loader2 className="w-5 h-5 animate-spin" />
             </div>
           </div>
         )}
@@ -562,7 +563,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
               width: '100%',
               position: 'relative',
               transform: `translateY(${pullDistance}px)`,
-              transition: pullState === 'idle' || pullState === 'refreshing'
+              transition: pullDistance === 0 || isRefreshing
                 ? 'transform 0.3s ease-out'
                 : 'none',
             }}
