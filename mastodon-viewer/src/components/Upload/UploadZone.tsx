@@ -108,6 +108,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
       }
 
       const latestFile = files[0]
+      const totalBytes = parseInt(latestFile.size, 10) || 0
       setDriveStatus(`Downloading ${latestFile.name}...`)
       
       // 2. Download the file
@@ -120,21 +121,39 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
          xhr.open('GET', downloadUrl)
          xhr.setRequestHeader('Authorization', `Bearer ${googleAccessToken}`)
          xhr.responseType = 'blob'
+         
+         // 3 minutes timeout
+         xhr.timeout = 180000 
 
          xhr.onprogress = (event) => {
-            if (event.lengthComputable) {
-               const percentComplete = (event.loaded / event.total) * 100
+            // Use metadata size if available, fallback to event.total
+            const total = totalBytes > 0 ? totalBytes : (event.lengthComputable ? event.total : 0)
+
+            if (total > 0) {
+               const loaded = event.loaded
+               let percentComplete = (loaded / total) * 100
+               // Cap at 99% until fully complete
+               if (percentComplete > 99) percentComplete = 99
+               
                setUploadProgress(percentComplete)
                setDriveStatus(`Downloading... ${Math.round(percentComplete)}%`)
+            } else {
+               // Indeterminate state if we have no size info
+               setDriveStatus(`Downloading... ${Math.round(event.loaded / 1024 / 1024)}MB`)
             }
          }
 
          xhr.onload = () => {
              if (xhr.status === 200) {
+                 setUploadProgress(100)
                  resolve(xhr.response)
              } else {
-                 reject(new Error('Download failed'))
+                 reject(new Error(`Download failed with status: ${xhr.status}`))
              }
+         }
+
+         xhr.ontimeout = () => {
+             reject(new Error('Download timed out. Please check your network connection.'))
          }
 
          xhr.onerror = () => reject(new Error('Network error during download'))
