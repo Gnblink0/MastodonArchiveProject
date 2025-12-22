@@ -24,11 +24,62 @@ function App() {
   const [googleUser, setGoogleUser] = useState<any>(null)
   const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null)
 
+  // Helper function to clear Google auth
+  const clearGoogleAuth = () => {
+    setGoogleUser(null)
+    setGoogleAccessToken(null)
+    localStorage.removeItem('google_access_token')
+    localStorage.removeItem('google_user')
+    localStorage.removeItem('google_token_expiry')
+  }
+
+  // Restore Google login from localStorage on mount
+  useEffect(() => {
+    const savedToken = localStorage.getItem('google_access_token')
+    const savedUser = localStorage.getItem('google_user')
+    const tokenExpiry = localStorage.getItem('google_token_expiry')
+
+    if (savedToken && savedUser && tokenExpiry) {
+      // Check if token is expired
+      const expiryTime = parseInt(tokenExpiry, 10)
+      if (Date.now() < expiryTime) {
+        setGoogleAccessToken(savedToken)
+        setGoogleUser(JSON.parse(savedUser))
+
+        // Verify token is still valid by making a test request
+        fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${savedToken}` },
+        })
+          .then(res => {
+            if (!res.ok) {
+              // Token is invalid, clear everything
+              console.log('Stored token is invalid, clearing...')
+              clearGoogleAuth()
+            }
+          })
+          .catch(() => {
+            // Network error, keep the token for now
+            console.log('Failed to verify token, but keeping it')
+          })
+      } else {
+        // Token expired, clear storage
+        clearGoogleAuth()
+      }
+    }
+  }, [])
+
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       console.log('Google Login Success:', tokenResponse)
       setGoogleAccessToken(tokenResponse.access_token)
-      
+
+      // Calculate token expiry (Google tokens typically last 1 hour)
+      const expiryTime = Date.now() + (tokenResponse.expires_in || 3600) * 1000
+
+      // Save to localStorage
+      localStorage.setItem('google_access_token', tokenResponse.access_token)
+      localStorage.setItem('google_token_expiry', expiryTime.toString())
+
       // Fetch user profile
       try {
         const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
@@ -36,6 +87,9 @@ function App() {
         })
         const userInfo = await res.json()
         setGoogleUser(userInfo)
+
+        // Save user info to localStorage
+        localStorage.setItem('google_user', JSON.stringify(userInfo))
       } catch (err) {
         console.error('Failed to fetch Google user info', err)
       }
@@ -45,8 +99,7 @@ function App() {
   });
 
   const handleLogout = () => {
-    setGoogleUser(null)
-    setGoogleAccessToken(null)
+    clearGoogleAuth()
   }
 
   useEffect(() => {

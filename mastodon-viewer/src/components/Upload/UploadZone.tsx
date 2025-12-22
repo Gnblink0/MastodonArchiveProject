@@ -111,94 +111,84 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
       const totalBytes = parseInt(latestFile.size, 10) || 0
       setDriveStatus(`Downloading ${latestFile.name}...`)
 
-      // 2. Download the file with chunked approach for mobile compatibility
+      // 2. Download the file using Fetch API with streaming for better mobile compatibility
       const downloadUrl = `https://www.googleapis.com/drive/v3/files/${latestFile.id}?alt=media`
 
       setUploadProgress(0) // Start progress bar at 0%
 
-      // Use chunked download for better mobile compatibility
-      const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB chunks for mobile
-      const chunks: Uint8Array[] = []
-      let downloadedBytes = 0
-
       const blob = await new Promise<Blob>(async (resolve, reject) => {
+         // Timeout wrapper to prevent infinite waiting
+         const timeoutId = setTimeout(() => {
+            reject(new Error('Download timeout after 10 minutes. Please check your connection and try again.'))
+         }, 600000) // 10 minutes total timeout
+
          try {
-            // For small files (< 10MB), use single request
-            if (totalBytes > 0 && totalBytes < 10 * 1024 * 1024) {
-               const xhr = new XMLHttpRequest()
-               xhr.open('GET', downloadUrl)
-               xhr.setRequestHeader('Authorization', `Bearer ${googleAccessToken}`)
-               xhr.responseType = 'blob'
-               xhr.timeout = 300000 // 5 minutes for small files
+            // Create abort controller for fetch timeout
+            const controller = new AbortController()
 
-               xhr.onprogress = (event) => {
-                  if (event.lengthComputable) {
-                     const percentComplete = (event.loaded / event.total) * 100
-                     setUploadProgress(Math.min(percentComplete, 99))
-                     setDriveStatus(`Downloading... ${Math.round(percentComplete)}%`)
-                  }
-               }
+            const response = await fetch(downloadUrl, {
+               headers: {
+                  'Authorization': `Bearer ${googleAccessToken}`
+               },
+               signal: controller.signal
+            })
 
-               xhr.onload = () => {
-                  if (xhr.status === 200) {
-                     setUploadProgress(100)
-                     resolve(xhr.response)
-                  } else {
-                     reject(new Error(`Download failed with status: ${xhr.status}`))
-                  }
-               }
-
-               xhr.onerror = () => reject(new Error('Network error during download'))
-               xhr.ontimeout = () => reject(new Error('Download timed out'))
-               xhr.send()
-               return
+            if (!response.ok) {
+               throw new Error(`Download failed with status: ${response.status}`)
             }
 
-            // For larger files, use chunked download
-            while (downloadedBytes < totalBytes) {
-               const start = downloadedBytes
-               const end = Math.min(start + CHUNK_SIZE - 1, totalBytes - 1)
+            // Get response body reader for streaming
+            const reader = response.body?.getReader()
+            if (!reader) {
+               throw new Error('Unable to read response body')
+            }
 
-               const chunkBlob = await new Promise<Blob>((resolveChunk, rejectChunk) => {
-                  const xhr = new XMLHttpRequest()
-                  xhr.open('GET', downloadUrl)
-                  xhr.setRequestHeader('Authorization', `Bearer ${googleAccessToken}`)
-                  xhr.setRequestHeader('Range', `bytes=${start}-${end}`)
-                  xhr.responseType = 'blob'
-                  xhr.timeout = 120000 // 2 minutes per chunk
+            // Get total size from content-length or use metadata
+            const contentLength = response.headers.get('content-length')
+            const total = contentLength ? parseInt(contentLength, 10) : totalBytes
 
-                  xhr.onload = () => {
-                     if (xhr.status === 206 || xhr.status === 200) {
-                        resolveChunk(xhr.response)
-                     } else {
-                        rejectChunk(new Error(`Chunk download failed: ${xhr.status}`))
-                     }
-                  }
+            let receivedBytes = 0
+            const chunks: Uint8Array[] = []
+            let lastProgressTime = Date.now()
 
-                  xhr.onerror = () => rejectChunk(new Error('Network error'))
-                  xhr.ontimeout = () => rejectChunk(new Error('Chunk timed out'))
-                  xhr.send()
-               })
+            // Read stream in chunks with timeout detection
+            while (true) {
+               // Check for stall (no progress for 30 seconds)
+               const now = Date.now()
+               if (now - lastProgressTime > 30000) {
+                  controller.abort()
+                  throw new Error('Download stalled. Please check your connection.')
+               }
 
-               // Convert blob chunk to Uint8Array and store
-               const arrayBuffer = await chunkBlob.arrayBuffer()
-               chunks.push(new Uint8Array(arrayBuffer))
+               const { done, value } = await reader.read()
 
-               downloadedBytes += chunkBlob.size
+               if (done) break
+
+               chunks.push(value)
+               receivedBytes += value.length
+               lastProgressTime = Date.now()
 
                // Update progress
-               const percentComplete = (downloadedBytes / totalBytes) * 100
-               setUploadProgress(Math.min(percentComplete, 99))
-               setDriveStatus(`Downloading... ${Math.round(percentComplete)}%`)
+               if (total > 0) {
+                  const percentComplete = (receivedBytes / total) * 100
+                  setUploadProgress(Math.min(percentComplete, 99))
+                  setDriveStatus(`Downloading... ${Math.round(percentComplete)}%`)
+               } else {
+                  // If no total size, show MB downloaded
+                  setDriveStatus(`Downloading... ${Math.round(receivedBytes / 1024 / 1024)}MB`)
+               }
             }
 
+            clearTimeout(timeoutId)
+
             // Combine all chunks into a single blob
-            setDriveStatus('Combining chunks...')
-            const combinedBlob = new Blob(chunks as any)
+            setDriveStatus('Processing...')
+            const combinedBlob = new Blob(chunks)
             setUploadProgress(100)
             resolve(combinedBlob)
 
          } catch (error) {
+            clearTimeout(timeoutId)
             reject(error)
          }
       })
