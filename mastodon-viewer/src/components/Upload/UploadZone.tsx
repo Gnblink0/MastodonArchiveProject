@@ -20,6 +20,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
   const [mode, setMode] = useState<'local' | 'drive'>('local')
   const [driveFiles, setDriveFiles] = useState<any[]>([])
   const [hasCheckedFiles, setHasCheckedFiles] = useState(false)
+  const [showSlowDownloadTip, setShowSlowDownloadTip] = useState(false)
 
   // Search for existing files in Drive
   const searchDriveFiles = useCallback(async () => {
@@ -73,6 +74,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
     setDriveStatus('Downloading from Drive...')
     setUploadProgress(-1)
     setError(null)
+    setShowSlowDownloadTip(false)
 
     try {
       // Use cached files if available, otherwise search
@@ -117,11 +119,6 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
       setUploadProgress(0) // Start progress bar at 0%
 
       const blob = await new Promise<Blob>(async (resolve, reject) => {
-         // Timeout wrapper to prevent infinite waiting
-         const timeoutId = setTimeout(() => {
-            reject(new Error('Download timeout after 10 minutes. Please check your connection and try again.'))
-         }, 600000) // 10 minutes total timeout
-
          try {
             // Create abort controller for fetch timeout
             const controller = new AbortController()
@@ -130,7 +127,10 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
                headers: {
                   'Authorization': `Bearer ${googleAccessToken}`
                },
-               signal: controller.signal
+               signal: controller.signal,
+               // Enable caching and keep-alive for better performance
+               cache: 'default',
+               keepalive: true
             })
 
             if (!response.ok) {
@@ -150,14 +150,32 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
             let receivedBytes = 0
             const chunks: Uint8Array[] = []
             let lastProgressTime = Date.now()
+            const startTime = Date.now()
+            let lastSpeedUpdateTime = startTime
+            let lastSpeedUpdateBytes = 0
 
-            // Read stream in chunks with timeout detection
+            // Helper function to format bytes
+            const formatBytes = (bytes: number) => {
+               if (bytes < 1024) return `${bytes} B`
+               if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+               return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+            }
+
+            // Helper function to format time
+            const formatTime = (seconds: number) => {
+               if (seconds < 60) return `${Math.round(seconds)}s`
+               const minutes = Math.floor(seconds / 60)
+               const secs = Math.round(seconds % 60)
+               return `${minutes}m ${secs}s`
+            }
+
+            // Read stream in chunks with stall detection
             while (true) {
-               // Check for stall (no progress for 30 seconds)
+               // Check for stall (no progress for 2 minutes)
                const now = Date.now()
-               if (now - lastProgressTime > 30000) {
+               if (now - lastProgressTime > 120000) {
                   controller.abort()
-                  throw new Error('Download stalled. Please check your connection.')
+                  throw new Error('Download stalled for 2 minutes. Please check your connection and try again.')
                }
 
                const { done, value } = await reader.read()
@@ -168,18 +186,39 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
                receivedBytes += value.length
                lastProgressTime = Date.now()
 
-               // Update progress
-               if (total > 0) {
-                  const percentComplete = (receivedBytes / total) * 100
-                  setUploadProgress(Math.min(percentComplete, 99))
-                  setDriveStatus(`Downloading... ${Math.round(percentComplete)}%`)
-               } else {
-                  // If no total size, show MB downloaded
-                  setDriveStatus(`Downloading... ${Math.round(receivedBytes / 1024 / 1024)}MB`)
+               // Calculate speed and ETA (update every 500ms to avoid too frequent updates)
+               if (now - lastSpeedUpdateTime > 500) {
+                  const timeDiff = (now - lastSpeedUpdateTime) / 1000 // seconds
+                  const bytesDiff = receivedBytes - lastSpeedUpdateBytes
+                  const speed = bytesDiff / timeDiff // bytes per second
+
+                  lastSpeedUpdateTime = now
+                  lastSpeedUpdateBytes = receivedBytes
+
+                  // Show tip if download is slow (< 50 KB/s) and has been downloading for more than 10 seconds
+                  const elapsedTime = (now - startTime) / 1000
+                  if (speed < 50 * 1024 && elapsedTime > 10) {
+                     setShowSlowDownloadTip(true)
+                  }
+
+                  // Update progress with speed and ETA
+                  if (total > 0) {
+                     const percentComplete = (receivedBytes / total) * 100
+                     const remainingBytes = total - receivedBytes
+                     const eta = speed > 0 ? remainingBytes / speed : 0
+
+                     setUploadProgress(Math.min(percentComplete, 99))
+                     setDriveStatus(
+                        `${Math.round(percentComplete)}% • ${formatBytes(speed)}/s • ${formatTime(eta)} remaining`
+                     )
+                  } else {
+                     // If no total size, show MB downloaded and speed
+                     setDriveStatus(
+                        `${formatBytes(receivedBytes)} • ${formatBytes(speed)}/s`
+                     )
+                  }
                }
             }
-
-            clearTimeout(timeoutId)
 
             // Combine all chunks into a single blob
             setDriveStatus('Processing...')
@@ -188,7 +227,6 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
             resolve(combinedBlob)
 
          } catch (error) {
-            clearTimeout(timeoutId)
             reject(error)
          }
       })
@@ -385,17 +423,21 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
               ) : driveLoading ? (
                  <div className="w-full bg-mastodon-surface border border-mastodon-border rounded-lg p-6 flex flex-col items-center justify-center space-y-4">
                     {uploadProgress >= 0 && uploadProgress < 100 ? (
-                       <div className="w-full space-y-2">
-                          <div className="flex justify-between text-xs text-mastodon-text-secondary">
-                             <span>{driveStatus.startsWith('Downloading') ? 'Downloading...' : 'Uploading...'}</span>
-                             <span>{Math.round(uploadProgress)}%</span>
+                       <div className="w-full space-y-3">
+                          <div className="text-xs text-mastodon-text-secondary text-center">
+                             <div>{driveStatus}</div>
                           </div>
                           <div className="w-full bg-mastodon-bg rounded-full h-2 overflow-hidden">
-                             <div 
+                             <div
                                 className="bg-[#34a853] h-full transition-all duration-300 ease-out"
                                 style={{ width: `${uploadProgress}%` }}
                              />
                           </div>
+                          {showSlowDownloadTip && (
+                             <div className="text-xs text-yellow-400/80 text-center px-4 py-2 bg-yellow-400/10 rounded border border-yellow-400/20">
+                                Slow connection detected. Consider using local upload or connect to WiFi for faster speed.
+                             </div>
+                          )}
                        </div>
                     ) : (
                        <>
