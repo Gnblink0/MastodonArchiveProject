@@ -9,6 +9,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { useInfiniteScrollPosts } from '../../hooks/useInfiniteScroll'
 import { ScrollToTopButton } from './ScrollToTopButton'
 import { TimelineDrawer } from './TimelineDrawer'
+import { useAccountFilter } from '../../contexts/AccountFilterContext'
 
 interface TimelineProps {
   onPostClick?: (postId: string) => void
@@ -19,9 +20,12 @@ interface TimelineProps {
 }
 
 export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineProps) {
+  // --- Account Filter from Global Context ---
+  const { selectedAccountId } = useAccountFilter()
+
   // --- States and Refs ---
-  const { posts: timelinePosts, isLoading, hasMore, loadMore } = useInfiniteScrollPosts()
-  const totalCountDB = usePostsCount()
+  const { posts: timelinePosts, isLoading, hasMore, loadMore } = useInfiniteScrollPosts(selectedAccountId)
+  const totalCountDB = usePostsCount(selectedAccountId)
 
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Post[]>([])
@@ -136,18 +140,23 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
   }, [props.scrollToIndex, rowVirtualizer, props.clearScrollToIndex]);
 
 
-  // Load all posts for search indexing (and timeline drawer)
+  // Load all posts for search indexing (filtered by selected account)
   useEffect(() => {
     const loadAllPosts = async () => {
       try {
-        const p = await db.posts.toArray()
+        let p: Post[]
+        if (selectedAccountId) {
+          p = await db.posts.where('accountId').equals(selectedAccountId).toArray()
+        } else {
+          p = await db.posts.toArray()
+        }
         setAllPosts(p)
       } catch (e) {
         console.error("Failed to load posts for search", e)
       }
     }
     loadAllPosts()
-  }, [])
+  }, [selectedAccountId])
 
   // Initialize Fuse for search
   const fuse = useMemo(() => {
@@ -389,11 +398,17 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
     const nextMonthStart = new Date(year, month + 1, 1).getTime()
 
     try {
-      // Get posts from this month, sorted by newest first
-      const monthPosts = await db.posts
-        .where('timestamp')
-        .between(monthStart, nextMonthStart, true, false) // [monthStart, nextMonthStart)
-        .toArray()
+      // Get posts from this month, filtered by account if selected
+      let monthPosts: Post[]
+      if (selectedAccountId) {
+        const allAccountPosts = await db.posts.where('accountId').equals(selectedAccountId).toArray()
+        monthPosts = allAccountPosts.filter(p => p.timestamp >= monthStart && p.timestamp < nextMonthStart)
+      } else {
+        monthPosts = await db.posts
+          .where('timestamp')
+          .between(monthStart, nextMonthStart, true, false)
+          .toArray()
+      }
 
       if (monthPosts.length > 0) {
         // Sort by timestamp descending (newest first) and take first 30

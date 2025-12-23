@@ -4,6 +4,7 @@ import { db } from '../lib/db'
 import { Star, Bookmark as BookmarkIcon, ArrowUpDown, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { EmbeddedPost } from '../components/Timeline/EmbeddedPost'
 import { ScrollToTopButton } from '../components/Timeline/ScrollToTopButton'
+import { useAccountFilter } from '../contexts/AccountFilterContext'
 
 interface InteractionsPageProps {
   type: 'likes' | 'bookmarks'
@@ -18,24 +19,33 @@ export function InteractionsPage({ type }: InteractionsPageProps) {
   const [sortOption, setSortOption] = useState<SortOption>('original')
   const [isSortOpen, setIsSortOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const { selectedAccountId } = useAccountFilter()
 
   // Query for total count
   const totalCount = useLiveQuery(async () => {
     const table = type === 'likes' ? db.likes : db.bookmarks
+    if (selectedAccountId) {
+      return await table.where('accountId').equals(selectedAccountId).count()
+    }
     return await table.count()
-  }, [type]) || 0
+  }, [type, selectedAccountId]) || 0
 
   // Query for paginated data
   const data = useLiveQuery(async () => {
     const table = type === 'likes' ? db.likes : db.bookmarks
     const offset = (currentPage - 1) * PAGE_SIZE
-    
-    let collection = table.toCollection()
-    
+
+    let collection
+    if (selectedAccountId) {
+      collection = table.where('accountId').equals(selectedAccountId)
+    } else {
+      collection = table.toCollection()
+    }
+
     if (sortOption === 'reverse') {
       collection = collection.reverse()
     }
-    
+
     const items = await collection
       .offset(offset)
       .limit(PAGE_SIZE)
@@ -50,7 +60,7 @@ export function InteractionsPage({ type }: InteractionsPageProps) {
          timestamp: type === 'likes' ? (item as any).likedAt : (item as any).bookmarkedAt,
        }
     })
-  }, [type, currentPage, sortOption])
+  }, [type, currentPage, sortOption, selectedAccountId])
 
   const sortOptions: { value: SortOption; label: string }[] = [
     { value: 'original', label: 'Original Order' },

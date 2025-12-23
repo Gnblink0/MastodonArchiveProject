@@ -1,6 +1,6 @@
 import { ExternalLink, Reply } from 'lucide-react'
 import type { Post } from '../../types'
-import { useMedia, useActor } from '../../hooks/usePosts'
+import { useMedia, useAccount } from '../../hooks/usePosts'
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
@@ -34,9 +34,9 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
   const displayPost = boostedPost || post
   // If it's a boost but we found the original, use the original's media/content
   // BUT we keep the "Boosted by" header from the wrapper post
-  
+
   const media = useMedia(displayPost.mediaIds)
-  const actor = useActor()
+  const actor = useAccount(post.accountId)
   const [isExpanded, setIsExpanded] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)

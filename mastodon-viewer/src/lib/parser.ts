@@ -5,6 +5,7 @@ import untar from 'js-untar'
 import { db } from './db'
 import type {
   Actor,
+  Account,
   Post,
   Media,
   Like,
@@ -53,17 +54,31 @@ export class ArchiveParser {
 
     // 解析各个部分
     const actor = await this.parseActor(container)
+    const accountId = actor.id
+
+    // 检查账号是否已存在
+    const accountExists = await db.hasAccount(accountId)
+
+    if (accountExists) {
+      this.reportProgress('检测到已有账号，将更新数据', 5, 100)
+      console.log(`账号已存在: ${actor.preferredUsername} (${accountId}), 将更新数据`)
+    } else {
+      this.reportProgress('新账号，开始导入', 5, 100)
+      console.log(`新账号: ${actor.preferredUsername} (${accountId}), 开始导入`)
+    }
+
     const posts = await this.parsePosts(container)
     const likes = await this.parseLikes(container)
     const bookmarks = await this.parseBookmarks(container)
     const media = await this.parseMedia(container)
 
     // 保存到数据库
-    await this.saveToDatabase(actor, posts, likes, bookmarks, media)
+    await this.saveToDatabase(accountId, actor, posts, likes, bookmarks, media, accountExists)
 
     // 创建元数据
     const metadata: ArchiveMetadata = {
-      id: 'current',
+      id: accountId,      // 使用 accountId 而不是 'current'
+      accountId,          // 新增字段
       uploadedAt: new Date(),
       totalPosts: posts.length,
       totalLikes: likes.length,
@@ -266,7 +281,7 @@ export class ArchiveParser {
     return actor
   }
 
-  private async parsePosts(container: ArchiveContainer): Promise<Post[]> {
+  private async parsePosts(container: ArchiveContainer): Promise<Omit<Post, 'accountId'>[]> {
     // 查找 outbox.json
     let outboxFile = container.file('outbox.json')
     if (!outboxFile) {
@@ -287,7 +302,7 @@ export class ArchiveParser {
 
     this.reportProgress('解析帖子', 0, items.length)
 
-    const posts: Post[] = []
+    const posts: Omit<Post, 'accountId'>[] = []
     let skippedCount = 0
 
     for (let i = 0; i < items.length; i++) {
@@ -422,11 +437,11 @@ export class ArchiveParser {
     return posts
   }
 
-  private async parseMedia(container: ArchiveContainer): Promise<Media[]> {
+  private async parseMedia(container: ArchiveContainer): Promise<Omit<Media, 'accountId'>[]> {
     const mediaFiles = container.file(/^media_attachments\//)
     this.reportProgress('解析媒体文件', 0, mediaFiles.length)
 
-    const media: Media[] = []
+    const media: Omit<Media, 'accountId'>[] = []
     const BATCH_SIZE = 20 // Process 20 files concurrently
 
     for (let i = 0; i < mediaFiles.length; i += BATCH_SIZE) {
@@ -475,7 +490,7 @@ export class ArchiveParser {
     return media
   }
 
-  private async parseLikes(container: ArchiveContainer): Promise<Like[]> {
+  private async parseLikes(container: ArchiveContainer): Promise<Omit<Like, 'accountId'>[]> {
     // 查找 likes.json（可选文件）
     let likesFile = container.file('likes.json')
     if (!likesFile) {
@@ -524,7 +539,7 @@ export class ArchiveParser {
     return likes
   }
 
-  private async parseBookmarks(container: ArchiveContainer): Promise<Bookmark[]> {
+  private async parseBookmarks(container: ArchiveContainer): Promise<Omit<Bookmark, 'accountId'>[]> {
     // 查找 bookmarks.json（可选文件）
     let bookmarksFile = container.file('bookmarks.json')
     if (!bookmarksFile) {
@@ -574,16 +589,24 @@ export class ArchiveParser {
   }
 
   private async saveToDatabase(
+    accountId: string,
     actor: Actor,
-    posts: Post[],
-    likes: Like[],
-    bookmarks: Bookmark[],
-    media: Media[]
+    posts: Omit<Post, 'accountId'>[],
+    likes: Omit<Like, 'accountId'>[],
+    bookmarks: Omit<Bookmark, 'accountId'>[],
+    media: Omit<Media, 'accountId'>[],
+    isUpdate: boolean
   ) {
     this.reportProgress('准备保存...', 0, 100)
 
+    // 为所有数据添加 accountId
+    const postsWithAccount = posts.map(p => ({ ...p, accountId }))
+    const likesWithAccount = likes.map(l => ({ ...l, accountId }))
+    const bookmarksWithAccount = bookmarks.map(b => ({ ...b, accountId }))
+    const mediaWithAccount = media.map(m => ({ ...m, accountId }))
+
     // 过滤掉无效 ID 并去重
-    const validPosts = posts.filter(p => p.id && typeof p.id === 'string')
+    const validPosts = postsWithAccount.filter(p => p.id && typeof p.id === 'string')
     const uniquePosts = Array.from(
       new Map(validPosts.map(p => [p.id, p])).values()
     )
@@ -591,21 +614,31 @@ export class ArchiveParser {
     console.log(`原始: ${posts.length} 条，有效: ${validPosts.length} 条，去重后: ${uniquePosts.length} 条`)
 
     // 过滤无效的 likes 和 bookmarks
-    const validLikes = likes.filter(l => l.id && typeof l.id === 'string')
-    const validBookmarks = bookmarks.filter(b => b.id && typeof b.id === 'string')
-    const validMedia = media.filter(m => m.id && typeof m.id === 'string')
+    const validLikes = likesWithAccount.filter(l => l.id && typeof l.id === 'string')
+    const validBookmarks = bookmarksWithAccount.filter(b => b.id && typeof b.id === 'string')
+    const validMedia = mediaWithAccount.filter(m => m.id && typeof m.id === 'string')
 
-    // 1. 清空旧数据
-    this.reportProgress('清空旧数据...', 0, 100)
-    await db.transaction('rw', [db.actor, db.posts, db.likes, db.bookmarks, db.media], async () => {
-      await db.actor.clear()
-      await db.posts.clear()
-      await db.likes.clear()
-      await db.bookmarks.clear()
-      await db.media.clear()
-      
-      // 保存用户信息
-      await db.actor.put(actor)
+    await db.transaction('rw', [db.accounts, db.posts, db.likes, db.bookmarks, db.media], async () => {
+      if (isUpdate) {
+        // 更新模式：删除该账号的旧数据
+        this.reportProgress('清空该账号的旧数据...', 0, 100)
+        await db.posts.where('accountId').equals(accountId).delete()
+        await db.likes.where('accountId').equals(accountId).delete()
+        await db.bookmarks.where('accountId').equals(accountId).delete()
+        await db.media.where('accountId').equals(accountId).delete()
+      }
+
+      // 创建或更新 Account 记录
+      const account: Account = {
+        ...actor,
+        importedAt: isUpdate ? (await db.accounts.get(accountId))?.importedAt || new Date() : new Date(),
+        lastUpdatedAt: new Date(),
+        postsCount: uniquePosts.length,
+        likesCount: validLikes.length,
+        bookmarksCount: validBookmarks.length
+      }
+      await db.accounts.put(account)
+      console.log(`账号记录已${isUpdate ? '更新' : '创建'}: ${account.preferredUsername}`)
     })
 
     // 2. 分批保存帖子

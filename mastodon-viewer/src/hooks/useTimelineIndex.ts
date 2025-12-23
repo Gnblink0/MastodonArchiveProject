@@ -16,9 +16,14 @@ export interface TimelineYear {
   months: TimelineMonth[]
 }
 
-export function useTimelineIndex(): TimelineYear[] {
-  // Query all posts
-  const allPosts = useLiveQuery(() => db.posts.toArray(), [])
+export function useTimelineIndex(accountId?: string): TimelineYear[] {
+  // Query all posts (filtered by account if specified)
+  const allPosts = useLiveQuery(async () => {
+    if (accountId) {
+      return await db.posts.where('accountId').equals(accountId).toArray()
+    }
+    return await db.posts.toArray()
+  }, [accountId])
 
   // Group by year and month
   const timelineIndex = useMemo(() => {

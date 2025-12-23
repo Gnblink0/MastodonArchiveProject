@@ -13,6 +13,25 @@ export interface Actor {
   createdAt: Date
 }
 
+// 新增：Account 接口用于存储多个账号
+export interface Account {
+  id: string
+  preferredUsername: string
+  displayName: string
+  summary: string
+  avatarBlob?: Blob
+  avatarUrl?: string
+  headerBlob?: Blob
+  headerUrl?: string
+  fields: ActorField[]
+  createdAt: Date
+  importedAt: Date        // 首次导入时间
+  lastUpdatedAt: Date     // 最后更新时间
+  postsCount: number      // 该账号的帖子数
+  likesCount: number      // 该账号的点赞数
+  bookmarksCount: number  // 该账号的书签数
+}
+
 export interface ActorField {
   name: string
   value: string
@@ -20,6 +39,7 @@ export interface ActorField {
 
 export interface Post {
   id: string
+  accountId: string       // 新增：关联到账号
   activityId: string
   type: 'post' | 'boost'
   content: string // HTML 内容
@@ -39,6 +59,7 @@ export interface Post {
 
 export interface Media {
   id: string
+  accountId: string       // 新增：关联到账号
   filename: string
   type: 'image' | 'video' | 'audio' | 'unknown'
   blob: Blob
@@ -50,15 +71,17 @@ export interface Media {
 
 export interface Like {
   id: string
+  accountId: string       // 新增：关联到账号
   activityId: string
   likedPostId: string
-  targetUrl?: string 
+  targetUrl?: string
   likedAt?: Date
   postPreview?: string
 }
 
 export interface Bookmark {
   id: string
+  accountId: string       // 新增：关联到账号
   activityId: string
   bookmarkedPostId: string
   targetUrl?: string
@@ -68,6 +91,7 @@ export interface Bookmark {
 
 export interface ArchiveMetadata {
   id: string
+  accountId: string       // 新增：关联到账号
   uploadedAt: Date
   totalPosts: number
   totalLikes: number

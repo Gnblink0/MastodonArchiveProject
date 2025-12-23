@@ -16,6 +16,7 @@ import {
 } from 'recharts'
 import { BarChart3, TrendingUp, Calendar } from 'lucide-react'
 import { format, startOfYear, endOfYear, getYear, eachWeekOfInterval } from 'date-fns'
+import { useAccountFilter } from '../contexts/AccountFilterContext'
 
 export function StatsPage() {
   const [chartType, setChartType] = useState<'line' | 'bar'>('line')
@@ -23,12 +24,24 @@ export function StatsPage() {
   const [tooltipVisible, setTooltipVisible] = useState(false)
   const [tooltipContent, setTooltipContent] = useState<{ date: string; original: number; reply: number; boost: number; total: number } | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const { selectedAccountId } = useAccountFilter()
 
   const stats = useLiveQuery(async () => {
-    const allPosts = await db.posts.toArray()
-    const allLikes = await db.likes.toArray()
-    const allBookmarks = await db.bookmarks.toArray()
-    const metadata = await db.metadata.get('current')
+    // Filter posts, likes, and bookmarks by selected account
+    let allPosts, allLikes, allBookmarks
+    if (selectedAccountId) {
+      allPosts = await db.posts.where('accountId').equals(selectedAccountId).toArray()
+      allLikes = await db.likes.where('accountId').equals(selectedAccountId).toArray()
+      allBookmarks = await db.bookmarks.where('accountId').equals(selectedAccountId).toArray()
+    } else {
+      allPosts = await db.posts.toArray()
+      allLikes = await db.likes.toArray()
+      allBookmarks = await db.bookmarks.toArray()
+    }
+
+    const metadata = selectedAccountId
+      ? await db.metadata.get(selectedAccountId)
+      : await db.metadata.toArray().then(arr => arr[0]) // Get first metadata if not filtered
 
     // --- Toots Overview Table Data ---
     const overview = {
@@ -233,7 +246,7 @@ export function StatsPage() {
       },
       metadata
     }
-  })
+  }, [selectedAccountId])
 
   if (!stats) {
     return (

@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { useTimelineIndex, type TimelineYear } from '../../hooks/useTimelineIndex'
+import { useAccountFilter } from '../../contexts/AccountFilterContext'
 
 interface TimelineDrawerProps {
   isOpen: boolean
@@ -9,7 +10,8 @@ interface TimelineDrawerProps {
 }
 
 export function TimelineDrawer({ isOpen, onClose, onMonthSelect, currentMonth }: TimelineDrawerProps) {
-  const timelineIndex = useTimelineIndex()
+  const { selectedAccountId } = useAccountFilter()
+  const timelineIndex = useTimelineIndex(selectedAccountId)
 
   const handleMonthClick = (year: number, month: number) => {
     onMonthSelect(year, month)

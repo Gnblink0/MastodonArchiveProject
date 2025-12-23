@@ -7,9 +7,12 @@ import { DebugDashboard } from './components/Debug/DebugDashboard'
 import { MainLayout } from './components/Layout/MainLayout'
 import { StatsPage } from './pages/StatsPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { AccountsPage } from './pages/AccountsPage'
+import { AccountDetailPage } from './pages/AccountDetailPage'
 import { InteractionsPage } from './pages/InteractionsPage'
+import { AccountFilterProvider } from './contexts/AccountFilterContext'
 import { db } from './lib/db'
-import { Home, User, Trash2, BarChart3, X, Star, Bookmark, LogIn, LogOut, Cloud } from 'lucide-react'
+import { Home, Users, Trash2, BarChart3, X, Star, Bookmark, LogIn, LogOut } from 'lucide-react'
 import { useGoogleLogin } from '@react-oauth/google'
 
 function App() {
@@ -105,7 +108,13 @@ function App() {
   useEffect(() => {
     // 检查是否已有数据
     db.hasData().then(result => {
+      console.log('hasData result:', result)
       setHasData(result)
+      setLoading(false)
+    }).catch(error => {
+      console.error('Error checking data:', error)
+      // 如果检查失败，假设没有数据
+      setHasData(false)
       setLoading(false)
     })
   }, [])
@@ -175,12 +184,12 @@ function App() {
             <span className="text-lg">Statistics</span>
          </button>
 
-         <button 
-            onClick={() => { navigate('/profile'); setMobileMenuOpen(false) }}
+         <button
+            onClick={() => { navigate('/accounts'); setMobileMenuOpen(false) }}
             className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
          >
-            <User className="w-6 h-6" />
-            <span className="text-lg">Profile</span>
+            <Users className="w-6 h-6" />
+            <span className="text-lg">Accounts</span>
          </button>
 
 
@@ -204,25 +213,16 @@ function App() {
 
       <div className="px-6 pt-4 pb-24 mt-auto border-t border-mastodon-border/50">
         {googleAccessToken ? (
-          <>
-            <div className="flex items-center justify-between py-2 text-mastodon-text-secondary text-xs mb-2">
-              <span className="truncate">Logged in as {googleUser?.name || 'User'}</span>
-              <button
-                onClick={handleLogout}
-                className="text-red-400 hover:text-red-300 flex items-center gap-1.5 cursor-pointer ml-2"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span className="text-xs">Logout</span>
-              </button>
-            </div>
+          <div className="flex items-center justify-between py-2 text-mastodon-text-secondary text-xs mb-2">
+            <span className="truncate">Logged in as {googleUser?.name || 'User'}</span>
             <button
-              onClick={() => console.log('Upload to Drive')} // TODO: Implement upload
-              className="flex items-center justify-center gap-2 w-full py-2.5 mb-2 text-mastodon-primary hover:text-mastodon-primary/80 hover:bg-white/5 rounded-lg text-sm transition-colors cursor-pointer"
+              onClick={handleLogout}
+              className="text-red-400 hover:text-red-300 flex items-center gap-1.5 cursor-pointer ml-2"
             >
-              <Cloud className="w-4 h-4" />
-              <span>Sync to Drive</span>
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="text-xs">Logout</span>
             </button>
-          </>
+          </div>
         ) : (
           <button
             onClick={() => googleLogin()}
@@ -252,7 +252,7 @@ function App() {
   )
 
   return (
-    <>
+    <AccountFilterProvider>
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div
@@ -301,13 +301,15 @@ function App() {
            <Route path="/" element={<Timeline onPostClick={handlePostClick} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />} />
            <Route path="/post/:id" element={<ThreadView />} />
            <Route path="/stats" element={<StatsPage />} />
+           <Route path="/accounts" element={<AccountsPage googleUser={googleUser} googleLogin={googleLogin} googleAccessToken={googleAccessToken} />} />
+           <Route path="/account/*" element={<AccountDetailPage />} />
            <Route path="/profile" element={<ProfilePage />} />
            <Route path="/favourites" element={<InteractionsPage type="likes" />} />
            <Route path="/bookmarks" element={<InteractionsPage type="bookmarks" />} />
            <Route path="/debug" element={<DebugDashboard />} />
         </Routes>
       </MainLayout>
-    </>
+    </AccountFilterProvider>
   )
 }
 
