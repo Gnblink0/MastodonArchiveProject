@@ -140,10 +140,21 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
   }, [props.scrollToIndex, rowVirtualizer, props.clearScrollToIndex]);
 
 
-  // Load all posts for search indexing (filtered by selected account)
+  // Load all posts for search indexing (lazy load - only when user starts searching)
   useEffect(() => {
+    // Only load all posts if user has typed a search query
+    if (!query.trim()) {
+      return
+    }
+
+    // If already loaded, skip
+    if (allPosts.length > 0) {
+      return
+    }
+
     const loadAllPosts = async () => {
       try {
+        console.log('Loading all posts for search...')
         let p: Post[]
         if (selectedAccountId) {
           p = await db.posts.where('accountId').equals(selectedAccountId).toArray()
@@ -151,12 +162,13 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
           p = await db.posts.toArray()
         }
         setAllPosts(p)
+        console.log(`Loaded ${p.length} posts for search indexing`)
       } catch (e) {
         console.error("Failed to load posts for search", e)
       }
     }
     loadAllPosts()
-  }, [selectedAccountId])
+  }, [query, selectedAccountId, allPosts.length])
 
   // Initialize Fuse for search
   const fuse = useMemo(() => {

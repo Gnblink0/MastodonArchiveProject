@@ -11,7 +11,10 @@ import type {
   Like,
   Bookmark,
   ArchiveMetadata,
+  ImportRecord,
   ParseProgress,
+  ImportStrategy,
+  AccountConflict,
   ActivityPubActor,
   ActivityPubActivity,
   ActivityPubNote
@@ -34,9 +37,14 @@ interface ArchiveContainer {
 
 export class ArchiveParser {
   private onProgress?: (progress: ParseProgress) => void
+  private onAccountConflict?: (conflict: AccountConflict) => Promise<ImportStrategy>
 
-  constructor(onProgress?: (progress: ParseProgress) => void) {
+  constructor(
+    onProgress?: (progress: ParseProgress) => void,
+    onAccountConflict?: (conflict: AccountConflict) => Promise<ImportStrategy>
+  ) {
     this.onProgress = onProgress
+    this.onAccountConflict = onAccountConflict
   }
 
   async parseArchive(file: File): Promise<ArchiveMetadata> {
@@ -59,9 +67,24 @@ export class ArchiveParser {
     // 检查账号是否已存在
     const accountExists = await db.hasAccount(accountId)
 
+    let importStrategy: ImportStrategy = 'replace' // 默认策略
+
     if (accountExists) {
-      this.reportProgress('检测到已有账号，将更新数据', 5, 100)
-      console.log(`账号已存在: ${actor.preferredUsername} (${accountId}), 将更新数据`)
+      // 如果账号已存在且提供了冲突回调，询问用户选择策略
+      if (this.onAccountConflict) {
+        const conflict: AccountConflict = {
+          accountId: actor.id,
+          username: actor.preferredUsername,
+          displayName: actor.displayName
+        }
+        importStrategy = await this.onAccountConflict(conflict)
+        this.reportProgress(`将使用${importStrategy === 'replace' ? '覆盖' : '合并'}模式更新数据`, 5, 100)
+        console.log(`账号已存在: ${actor.preferredUsername} (${accountId}), 策略: ${importStrategy}`)
+      } else {
+        // 没有回调则默认覆盖
+        this.reportProgress('检测到已有账号，将覆盖数据', 5, 100)
+        console.log(`账号已存在: ${actor.preferredUsername} (${accountId}), 将覆盖数据`)
+      }
     } else {
       this.reportProgress('新账号，开始导入', 5, 100)
       console.log(`新账号: ${actor.preferredUsername} (${accountId}), 开始导入`)
@@ -73,7 +96,7 @@ export class ArchiveParser {
     const media = await this.parseMedia(container)
 
     // 保存到数据库
-    await this.saveToDatabase(accountId, actor, posts, likes, bookmarks, media, accountExists)
+    await this.saveToDatabase(accountId, actor, posts, likes, bookmarks, media, accountExists, importStrategy)
 
     // 创建元数据
     const metadata: ArchiveMetadata = {
@@ -89,6 +112,23 @@ export class ArchiveParser {
     }
 
     await db.metadata.put(metadata)
+
+    // 添加导入历史记录
+    const importRecord: ImportRecord = {
+      accountId,
+      importedAt: new Date(),
+      fileName: file.name,
+      fileSize: file.size,
+      stats: {
+        posts: posts.length,
+        likes: likes.length,
+        bookmarks: bookmarks.length,
+        media: media.length
+      },
+      importStrategy: accountExists ? importStrategy : 'replace'
+    }
+    
+    await db.importHistory.add(importRecord)
 
     this.reportProgress('完成', 100, 100)
 
@@ -595,7 +635,8 @@ export class ArchiveParser {
     likes: Omit<Like, 'accountId'>[],
     bookmarks: Omit<Bookmark, 'accountId'>[],
     media: Omit<Media, 'accountId'>[],
-    isUpdate: boolean
+    isUpdate: boolean,
+    importStrategy: ImportStrategy = 'replace'
   ) {
     this.reportProgress('准备保存...', 0, 100)
 
@@ -619,23 +660,27 @@ export class ArchiveParser {
     const validMedia = mediaWithAccount.filter(m => m.id && typeof m.id === 'string')
 
     await db.transaction('rw', [db.accounts, db.posts, db.likes, db.bookmarks, db.media], async () => {
-      if (isUpdate) {
-        // 更新模式：删除该账号的旧数据
+      if (isUpdate && importStrategy === 'replace') {
+        // 覆盖模式：删除该账号的旧数据
         this.reportProgress('清空该账号的旧数据...', 0, 100)
         await db.posts.where('accountId').equals(accountId).delete()
         await db.likes.where('accountId').equals(accountId).delete()
         await db.bookmarks.where('accountId').equals(accountId).delete()
         await db.media.where('accountId').equals(accountId).delete()
+      } else if (isUpdate && importStrategy === 'merge') {
+        // 合并模式：不删除旧数据，直接使用 bulkPut() 合并
+        this.reportProgress('准备合并数据...', 0, 100)
       }
 
-      // 创建或更新 Account 记录
+      // 创建或更新 Account 记录（合并模式下稍后更新统计）
       const account: Account = {
         ...actor,
         importedAt: isUpdate ? (await db.accounts.get(accountId))?.importedAt || new Date() : new Date(),
         lastUpdatedAt: new Date(),
-        postsCount: uniquePosts.length,
-        likesCount: validLikes.length,
-        bookmarksCount: validBookmarks.length
+        // 覆盖模式使用新数据的数量，合并模式使用临时值（稍后更新）
+        postsCount: importStrategy === 'replace' ? uniquePosts.length : 0,
+        likesCount: importStrategy === 'replace' ? validLikes.length : 0,
+        bookmarksCount: importStrategy === 'replace' ? validBookmarks.length : 0
       }
       await db.accounts.put(account)
       console.log(`账号记录已${isUpdate ? '更新' : '创建'}: ${account.preferredUsername}`)
@@ -672,6 +717,21 @@ export class ArchiveParser {
       const batch = validBookmarks.slice(i, i + BOOKMARK_BATCH_SIZE)
       await db.bookmarks.bulkPut(batch)
       this.reportProgress('正在保存书签...', Math.min(i + batch.length, validBookmarks.length), validBookmarks.length)
+    }
+
+    // 如果是合并模式，重新计算实际的统计数据
+    if (isUpdate && importStrategy === 'merge') {
+      this.reportProgress('更新统计数据...', 100, 100)
+      const actualPostsCount = await db.posts.where('accountId').equals(accountId).count()
+      const actualLikesCount = await db.likes.where('accountId').equals(accountId).count()
+      const actualBookmarksCount = await db.bookmarks.where('accountId').equals(accountId).count()
+
+      await db.accounts.update(accountId, {
+        postsCount: actualPostsCount,
+        likesCount: actualLikesCount,
+        bookmarksCount: actualBookmarksCount
+      })
+      console.log(`合并完成，实际数量 - 帖子: ${actualPostsCount}, 点赞: ${actualLikesCount}, 书签: ${actualBookmarksCount}`)
     }
 
     this.reportProgress('保存完成', 100, 100)

@@ -1,7 +1,8 @@
 import { useCallback, useState, useEffect } from 'react'
 import { Upload, FileArchive, Loader2, Cloud, ArrowRight } from 'lucide-react'
 import { ArchiveParser } from '../../lib/parser'
-import type { ParseProgress } from '../../types'
+import { ImportStrategyDialog } from './ImportStrategyDialog'
+import type { ParseProgress, ImportStrategy, AccountConflict } from '../../types'
 
 interface UploadZoneProps {
   onUploadComplete: () => void
@@ -21,6 +22,11 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
   const [driveFiles, setDriveFiles] = useState<any[]>([])
   const [hasCheckedFiles, setHasCheckedFiles] = useState(false)
   const [showSlowDownloadTip, setShowSlowDownloadTip] = useState(false)
+
+  // Import strategy dialog state
+  const [showStrategyDialog, setShowStrategyDialog] = useState(false)
+  const [currentConflict, setCurrentConflict] = useState<AccountConflict | null>(null)
+  const [strategyResolver, setStrategyResolver] = useState<((strategy: ImportStrategy) => void) | null>(null)
 
   // Search for existing files in Drive
   const searchDriveFiles = useCallback(async () => {
@@ -249,6 +255,25 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
     }
   }
 
+  // Handle account conflict callback
+  const handleAccountConflict = useCallback((conflict: AccountConflict): Promise<ImportStrategy> => {
+    return new Promise((resolve) => {
+      setCurrentConflict(conflict)
+      setShowStrategyDialog(true)
+      setStrategyResolver(() => resolve)
+    })
+  }, [])
+
+  // Handle strategy selection
+  const handleStrategySelect = useCallback((strategy: ImportStrategy) => {
+    setShowStrategyDialog(false)
+    if (strategyResolver) {
+      strategyResolver(strategy)
+      setStrategyResolver(null)
+    }
+    setCurrentConflict(null)
+  }, [strategyResolver])
+
   const handleFile = useCallback(async (file: File) => {
     const fileName = file.name.toLowerCase()
     const isValidFormat = fileName.endsWith('.zip') || fileName.endsWith('.tar.gz') || fileName.endsWith('.tgz')
@@ -280,7 +305,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
     setProgress(null)
 
     try {
-      const parser = new ArchiveParser(setProgress)
+      const parser = new ArchiveParser(setProgress, handleAccountConflict)
       await parser.parseArchive(file)
 
       // 解析完成
@@ -298,7 +323,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
     } finally {
       setUploading(false)
     }
-  }, [onUploadComplete])
+  }, [onUploadComplete, handleAccountConflict])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -717,6 +742,14 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
               )}
            </div>
         </div>
+      )}
+
+      {/* Import Strategy Dialog */}
+      {showStrategyDialog && currentConflict && (
+        <ImportStrategyDialog
+          conflict={currentConflict}
+          onSelect={handleStrategySelect}
+        />
       )}
     </div>
   )

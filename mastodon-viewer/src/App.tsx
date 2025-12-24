@@ -12,7 +12,7 @@ import { AccountDetailPage } from './pages/AccountDetailPage'
 import { InteractionsPage } from './pages/InteractionsPage'
 import { AccountFilterProvider } from './contexts/AccountFilterContext'
 import { db } from './lib/db'
-import { Home, Users, Trash2, BarChart3, X, Star, Bookmark, LogIn, LogOut } from 'lucide-react'
+import { Home, Users, Trash2, BarChart3, X, Star, Bookmark, LogIn, LogOut, Loader2 } from 'lucide-react'
 import { useGoogleLogin } from '@react-oauth/google'
 
 function App() {
@@ -127,7 +127,7 @@ function App() {
     return (
       <div className="min-h-screen bg-mastodon-bg flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-mastodon-primary mx-auto"></div>
+          <Loader2 className="w-12 h-12 animate-spin text-mastodon-primary mx-auto" />
           <p className="mt-4 text-mastodon-text-secondary">Loading...</p>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Actor, Account, Post, Media, Like, Bookmark, ArchiveMetadata } from '../types'
+import type { Actor, Account, Post, Media, Like, Bookmark, ArchiveMetadata, ImportRecord } from '../types'
 
 // 定义数据库类
 class MastodonArchiveDB extends Dexie {
@@ -10,6 +10,7 @@ class MastodonArchiveDB extends Dexie {
   likes!: EntityTable<Like, 'id'>
   bookmarks!: EntityTable<Bookmark, 'id'>
   metadata!: EntityTable<ArchiveMetadata, 'id'>
+  importHistory!: EntityTable<ImportRecord, 'id'>
 
   constructor() {
     super('MastodonArchive')
@@ -40,133 +41,62 @@ class MastodonArchiveDB extends Dexie {
       bookmarks: 'id, accountId, [accountId+bookmarkedAt], bookmarkedAt, bookmarkedPostId',
       metadata: 'id, accountId',
       actor: null  // 删除旧的 actor 表
+    })
+
+    // Version 5: Import History
+    this.version(5).stores({
+      importHistory: '++id, accountId, importedAt'
     }).upgrade(async (trans) => {
-      console.log('开始数据库迁移到 Version 4...')
-
-      try {
-        // 1. 读取旧的 actor 数据
-        const oldActors = await trans.table('actor').toArray()
-
-        if (oldActors.length > 0) {
-          const actor = oldActors[0]
-          const accountId = actor.id
-
-          console.log(`迁移账号: ${actor.preferredUsername} (${accountId})`)
-
-          // 2. 统计数据
-          const postsCount = await trans.table('posts').count()
-          const likesCount = await trans.table('likes').count()
-          const bookmarksCount = await trans.table('bookmarks').count()
-
-          // 3. 创建新的 account 记录
-          const account: Account = {
-            ...actor,
-            importedAt: new Date(),
-            lastUpdatedAt: new Date(),
-            postsCount,
-            likesCount,
-            bookmarksCount
-          }
-
-          await trans.table('accounts').add(account)
-          console.log('账号记录已创建')
-
-          // 4. 为所有现有数据添加 accountId（批量更新）
-          const BATCH_SIZE = 1000
-
-          // 更新 posts
-          const allPosts = await trans.table('posts').toArray()
-          console.log(`开始更新 ${allPosts.length} 条帖子...`)
-          for (let i = 0; i < allPosts.length; i += BATCH_SIZE) {
-            const batch = allPosts.slice(i, i + BATCH_SIZE)
-            await Promise.all(
-              batch.map(post =>
-                trans.table('posts').update(post.id, { accountId })
-              )
-            )
-            console.log(`已更新帖子: ${Math.min(i + BATCH_SIZE, allPosts.length)}/${allPosts.length}`)
-          }
-
-          // 更新 media
-          const allMedia = await trans.table('media').toArray()
-          console.log(`开始更新 ${allMedia.length} 个媒体文件...`)
-          for (let i = 0; i < allMedia.length; i += BATCH_SIZE) {
-            const batch = allMedia.slice(i, i + BATCH_SIZE)
-            await Promise.all(
-              batch.map(m =>
-                trans.table('media').update(m.id, { accountId })
-              )
-            )
-          }
-
-          // 更新 likes
-          const allLikes = await trans.table('likes').toArray()
-          console.log(`开始更新 ${allLikes.length} 个点赞...`)
-          for (let i = 0; i < allLikes.length; i += BATCH_SIZE) {
-            const batch = allLikes.slice(i, i + BATCH_SIZE)
-            await Promise.all(
-              batch.map(like =>
-                trans.table('likes').update(like.id, { accountId })
-              )
-            )
-          }
-
-          // 更新 bookmarks
-          const allBookmarks = await trans.table('bookmarks').toArray()
-          console.log(`开始更新 ${allBookmarks.length} 个书签...`)
-          for (let i = 0; i < allBookmarks.length; i += BATCH_SIZE) {
-            const batch = allBookmarks.slice(i, i + BATCH_SIZE)
-            await Promise.all(
-              batch.map(bm =>
-                trans.table('bookmarks').update(bm.id, { accountId })
-              )
-            )
-          }
-
-          // 5. 更新 metadata
-          const oldMetadata = await trans.table('metadata').get('current')
-          if (oldMetadata) {
-            await trans.table('metadata').delete('current')
-            await trans.table('metadata').add({
-              ...oldMetadata,
-              id: accountId,
-              accountId
-            })
-            console.log('元数据已更新')
-          }
-
-          console.log('数据库迁移完成！')
-        } else {
-          console.log('没有找到旧数据，跳过迁移')
+      console.log('Migrating to Version 5: Creating Import History...')
+      const allMetadata = await trans.table('metadata').toArray()
+      
+      for (const meta of allMetadata) {
+        if (!meta.accountId) continue
+        
+        // Convert existing metadata to an import record
+        const record: ImportRecord = {
+          accountId: meta.accountId,
+          importedAt: meta.uploadedAt || new Date(),
+          fileName: meta.originalFilename || 'Unknown Archive',
+          fileSize: meta.fileSize || 0,
+          stats: {
+            posts: meta.totalPosts || 0,
+            likes: meta.totalLikes || 0,
+            bookmarks: meta.totalBookmarks || 0,
+            media: meta.totalMedia || 0
+          },
+          importStrategy: 'replace' // Assume replace for legacy imports
         }
-      } catch (error) {
-        console.error('数据库迁移失败:', error)
-        throw error
+        
+        await trans.table('importHistory').add(record)
+        console.log(`Migrated metadata for account ${meta.accountId} to history.`)
       }
     })
   }
 
   // 清空所有数据（保留用于完全重置）
   async clearAll() {
-    await this.transaction('rw', [this.accounts, this.posts, this.media, this.likes, this.bookmarks, this.metadata], async () => {
+    await this.transaction('rw', [this.accounts, this.posts, this.media, this.likes, this.bookmarks, this.metadata, this.importHistory], async () => {
       await this.accounts.clear()
       await this.posts.clear()
       await this.media.clear()
       await this.likes.clear()
       await this.bookmarks.clear()
       await this.metadata.clear()
+      await this.importHistory.clear()
     })
   }
 
   // 删除单个账号的所有数据
   async clearAccount(accountId: string) {
-    await this.transaction('rw', [this.accounts, this.posts, this.media, this.likes, this.bookmarks, this.metadata], async () => {
+    await this.transaction('rw', [this.accounts, this.posts, this.media, this.likes, this.bookmarks, this.metadata, this.importHistory], async () => {
       // 删除账号数据
       await this.posts.where('accountId').equals(accountId).delete()
       await this.media.where('accountId').equals(accountId).delete()
       await this.likes.where('accountId').equals(accountId).delete()
       await this.bookmarks.where('accountId').equals(accountId).delete()
       await this.metadata.where('accountId').equals(accountId).delete()
+      await this.importHistory.where('accountId').equals(accountId).delete()
       await this.accounts.delete(accountId)
     })
   }
@@ -193,6 +123,20 @@ class MastodonArchiveDB extends Dexie {
   // 获取指定账号的元数据
   async getAccountMetadata(accountId: string): Promise<ArchiveMetadata | undefined> {
     return await this.metadata.get(accountId)
+  }
+
+  // Get import history for an account
+  async getImportHistory(accountId: string): Promise<ImportRecord[]> {
+    return await this.importHistory
+      .where('accountId')
+      .equals(accountId)
+      .reverse() // Newest first
+      .sortBy('importedAt')
+  }
+
+  // Add an import record
+  async addImportRecord(record: ImportRecord): Promise<number> {
+    return (await this.importHistory.add(record)) as number
   }
 
   // 检查是否有数据

@@ -89,6 +89,21 @@ export interface Bookmark {
   postPreview?: string
 }
 
+export interface ImportRecord {
+  id?: number // Auto-incremented by Dexie
+  accountId: string
+  importedAt: Date
+  fileName: string
+  fileSize: number
+  stats: {
+    posts: number
+    likes: number
+    bookmarks: number
+    media: number
+  }
+  importStrategy: 'replace' | 'merge'
+}
+
 export interface ArchiveMetadata {
   id: string
   accountId: string       // 新增：关联到账号
@@ -106,6 +121,14 @@ export interface ParseProgress {
   stage: string
   progress: number
   total: number
+}
+
+export type ImportStrategy = 'replace' | 'merge'
+
+export interface AccountConflict {
+  accountId: string
+  username: string
+  displayName: string
 }
 
 // 帖子查询过滤器

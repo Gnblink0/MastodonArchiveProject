@@ -1,10 +1,9 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAccount } from '../hooks/usePosts'
-import { Calendar, MessageSquare, ArrowLeft, Star, Bookmark } from 'lucide-react'
-import { useInfiniteScrollPosts } from '../hooks/useInfiniteScroll'
-import { PostCard } from '../components/Timeline/PostCard'
-import { Loader2 } from 'lucide-react'
-import { useRef, useEffect } from 'react'
+import { Calendar, MessageSquare, ArrowLeft, Star, Bookmark, History, FileArchive, Database } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { db } from '../lib/db'
+import type { ImportRecord } from '../types'
 
 export function AccountDetailPage() {
   const location = useLocation()
@@ -14,32 +13,24 @@ export function AccountDetailPage() {
   const accountId = decodeURIComponent(location.pathname.replace('/account/', ''))
 
   const account = useAccount(accountId)
-
-  // 加载该账号的帖子
-  const { posts, isLoading, hasMore, loadMore } = useInfiniteScrollPosts(accountId)
-
-  // 无限滚动检测
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const [history, setHistory] = useState<ImportRecord[]>([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true)
 
   useEffect(() => {
-    const handleScroll = () => {
-      const element = scrollRef.current
-      if (!element) return
-
-      const { scrollTop, scrollHeight, clientHeight } = element
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 500
-
-      if (isNearBottom && hasMore && !isLoading) {
-        loadMore()
+    if (accountId) {
+      const loadHistory = async () => {
+        try {
+          const records = await db.getImportHistory(accountId)
+          setHistory(records)
+        } catch (error) {
+          console.error('Failed to load import history:', error)
+        } finally {
+          setIsLoadingHistory(false)
+        }
       }
+      loadHistory()
     }
-
-    const element = scrollRef.current
-    if (element) {
-      element.addEventListener('scroll', handleScroll)
-      return () => element.removeEventListener('scroll', handleScroll)
-    }
-  }, [hasMore, isLoading, loadMore])
+  }, [accountId])
 
   // Loading state (undefined means still loading)
   if (account === undefined) {
@@ -78,8 +69,17 @@ export function AccountDetailPage() {
     year: 'numeric'
   }).format(account.createdAt)
 
+  // Format file size
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
   return (
-    <div ref={scrollRef} className="h-full overflow-auto">
+    <div className="h-full overflow-auto">
       <div className="max-w-4xl mx-auto pb-10">
         {/* Back Button */}
         <div className="px-6 pt-4 pb-2">
@@ -125,7 +125,13 @@ export function AccountDetailPage() {
           <div className="space-y-6">
             <div>
               <h1 className="text-3xl font-bold text-white mb-1">{account.displayName}</h1>
-              <p className="text-mastodon-text-secondary text-lg">@{account.preferredUsername}</p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <p className="text-mastodon-text-secondary text-lg">@{account.preferredUsername}</p>
+                <div className="flex items-center gap-1.5 text-mastodon-text-secondary text-sm bg-white/5 px-2 py-0.5 rounded-full">
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Joined {joinDate}</span>
+                </div>
+              </div>
             </div>
 
             {/* Bio */}
@@ -136,7 +142,7 @@ export function AccountDetailPage() {
 
             {/* Metadata Fields */}
             {account.fields && account.fields.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-mastodon-border py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-mastodon-border pt-4">
                 {account.fields.map((field, index) => (
                   <div key={index} className="flex flex-col">
                     <span className="text-mastodon-text-secondary text-sm uppercase font-bold text-xs">{field.name}</span>
@@ -146,14 +152,8 @@ export function AccountDetailPage() {
               </div>
             )}
 
-            {/* Joined Date */}
-            <div className="flex items-center gap-2 text-mastodon-text-secondary border-t border-mastodon-border pt-4 pb-4">
-              <Calendar className="w-4 h-4" />
-              <span>Joined {joinDate}</span>
-            </div>
-
             {/* Stats Bar */}
-            <div className="grid grid-cols-3 gap-4 border-t border-mastodon-border py-6">
+            <div className="grid grid-cols-3 gap-4 border-t border-mastodon-border pt-6 pb-2">
               <div className="flex flex-col items-center gap-2 p-4 bg-mastodon-bg rounded-lg">
                 <MessageSquare className="w-6 h-6 text-mastodon-primary" />
                 <span className="font-bold text-white text-2xl">{account.postsCount.toLocaleString()}</span>
@@ -173,41 +173,77 @@ export function AccountDetailPage() {
           </div>
         </div>
 
-        {/* Posts Timeline Section */}
+        {/* Archive History Section */}
         <div className="px-6 mt-8">
-          <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-            <MessageSquare className="w-6 h-6" />
-            Posts
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <History className="w-6 h-6" />
+            Archive History
           </h2>
 
-          {posts && posts.length > 0 ? (
-            <div className="space-y-0 bg-mastodon-surface rounded-lg overflow-hidden">
-              {posts.map(post => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                />
-              ))}
+          <div className="bg-mastodon-surface rounded-lg overflow-hidden border border-mastodon-border">
+            {isLoadingHistory ? (
+              <div className="p-8 text-center text-mastodon-text-secondary">
+                Loading history...
+              </div>
+            ) : history.length > 0 ? (
+              <div className="divide-y divide-mastodon-border">
+                {history.map((record) => (
+                  <div key={record.id} className="p-6 hover:bg-white/5 transition-colors">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-mastodon-primary/20 rounded-lg text-mastodon-primary mt-1">
+                          <FileArchive className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-white">{record.fileName}</h3>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-mastodon-text-secondary">
+                            <span>{new Date(record.importedAt).toLocaleString()}</span>
+                            <span>•</span>
+                            <span>{formatFileSize(record.fileSize)}</span>
+                            <span>•</span>
+                            <span className={`uppercase text-xs font-bold px-2 py-0.5 rounded ${
+                              record.importStrategy === 'replace' ? 'bg-red-500/20 text-red-300' : 'bg-blue-500/20 text-blue-300'
+                            }`}>
+                              {record.importStrategy || 'Replace'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
-              {/* Loading more indicator */}
-              {isLoading && (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-mastodon-primary" />
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 bg-mastodon-bg/50 p-4 rounded-lg">
+                      <div className="flex flex-col">
+                        <span className="text-mastodon-text-secondary text-xs uppercase font-bold">Posts</span>
+                        <span className="text-white text-lg font-mono">{record.stats.posts.toLocaleString()}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-mastodon-text-secondary text-xs uppercase font-bold">Media</span>
+                        <span className="text-white text-lg font-mono">{record.stats.media.toLocaleString()}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-mastodon-text-secondary text-xs uppercase font-bold">Likes</span>
+                        <span className="text-white text-lg font-mono">{record.stats.likes.toLocaleString()}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-mastodon-text-secondary text-xs uppercase font-bold">Bookmarks</span>
+                        <span className="text-white text-lg font-mono">{record.stats.bookmarks.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-12 text-center">
+                <div className="inline-block p-4 bg-mastodon-bg rounded-full mb-4 text-mastodon-text-secondary">
+                  <Database className="w-8 h-8" />
                 </div>
-              )}
-
-              {/* End of posts */}
-              {!hasMore && posts.length > 0 && (
-                <div className="text-center py-8 text-mastodon-text-secondary text-sm">
-                  No more posts
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="bg-mastodon-surface rounded-lg p-12 text-center text-mastodon-text-secondary">
-              No posts yet
-            </div>
-          )}
+                <h3 className="text-lg font-medium text-white mb-2">No Import History</h3>
+                <p className="text-mastodon-text-secondary">
+                  Import records will appear here after you upload an archive.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
