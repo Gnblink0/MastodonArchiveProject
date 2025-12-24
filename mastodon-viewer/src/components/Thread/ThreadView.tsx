@@ -112,7 +112,7 @@ export function ThreadView({ postId: propPostId, onClose }: ThreadViewProps) {
         </div>
       )}
 
-      <div className="flex flex-col space-y-3">
+      <div className="flex flex-col">
         {/* Missing Parent Indicator */}
         {(ancestors.length > 0 ? ancestors[0] : post)?.inReplyTo && (
            <div className="mb-4 p-4 border border-mastodon-border border-dashed rounded text-center text-mastodon-text-secondary bg-mastodon-bg/50">
@@ -129,28 +129,51 @@ export function ThreadView({ postId: propPostId, onClose }: ThreadViewProps) {
         )}
 
         {/* Ancestors */}
-        {ancestors.map(p => (
-          <div key={p.id} className="relative">
-             <PostCard post={p} />
-             <div className="mx-auto w-0.5 h-4 bg-mastodon-border/50"></div>
+        {ancestors.map((p, index) => (
+          <div key={p.id} className="relative mb-3">
+             <PostCard post={p} showBorder={false} />
+             {/* Connection line to next post */}
+             <div className="absolute left-[26px] bottom-[-12px] w-[2px] h-3 bg-mastodon-border/40"></div>
           </div>
         ))}
 
-        {/* Current Post */}
-        <div className="my-2 border-l-4 border-mastodon-primary pl-0 overflow-hidden">
-           <PostCard post={post} />
+        {/* Current Post - Highlighted */}
+        <div className="relative mb-3">
+           {ancestors.length > 0 && (
+             <div className="absolute left-[26px] top-[-12px] w-[2px] h-3 bg-mastodon-border/40"></div>
+           )}
+           <div className="relative">
+              <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-mastodon-primary rounded-full"></div>
+              <div className="pl-2">
+                 <PostCard post={post} showBorder={false} />
+              </div>
+           </div>
+           {/* Connection line to replies */}
+           {replies.length > 0 && (
+             <div className="absolute left-[26px] bottom-[-12px] w-[2px] h-3 bg-mastodon-border/40"></div>
+           )}
         </div>
 
         {/* Replies */}
         {replies.length > 0 && (
-           <div className="pl-6 border-l-2 border-mastodon-border ml-6 mt-3 space-y-3">
-              {replies.map(p => (
-                 <PostCard key={p.id} post={p} />
+           <div className="relative">
+              {replies.map((p, index) => (
+                 <div key={p.id} className="relative mb-3">
+                    {/* Vertical line connecting all replies */}
+                    {index < replies.length - 1 && (
+                      <div className="absolute left-[26px] top-0 bottom-[-12px] w-[2px] bg-mastodon-border/30"></div>
+                    )}
+                    {/* Horizontal connector to avatar */}
+                    <div className="absolute left-[26px] top-[26px] w-4 h-[2px] bg-mastodon-border/30"></div>
+                    <div className="pl-10">
+                       <PostCard post={p} showBorder={false} />
+                    </div>
+                 </div>
               ))}
            </div>
         )}
-        {replies.length === 0 && (
-           <p className="text-center text-sm text-mastodon-text-secondary py-8">
+        {replies.length === 0 && ancestors.length === 0 && (
+           <p className="text-center text-sm text-mastodon-text-secondary py-8 mt-4">
               No replies found in archive.
            </p>
         )}

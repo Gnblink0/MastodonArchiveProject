@@ -13,9 +13,10 @@ interface PostCardProps {
   post: Post
   highlight?: string
   onClick?: () => void
+  showBorder?: boolean
 }
 
-export function PostCard({ post, onClick, highlight }: PostCardProps) {
+export function PostCard({ post, onClick, highlight, showBorder = true }: PostCardProps) {
   // Logic to fetch boosted post if it's a boost
   const boostedPost = useLiveQuery(
     async () => {
@@ -127,7 +128,9 @@ export function PostCard({ post, onClick, highlight }: PostCardProps) {
   return (
     <article
        onClick={handleCardClick}
-       className="bg-mastodon-surface border-b border-mastodon-border p-4 hover:bg-opacity-80 transition-colors first:rounded-t-md last:rounded-b-md cursor-pointer"
+       className={`bg-mastodon-surface p-4 hover:bg-opacity-80 transition-colors cursor-pointer ${
+         showBorder ? 'border-b border-mastodon-border first:rounded-t-md last:rounded-b-md' : 'rounded-md'
+       }`}
     >
       {/* 转发标识 */}
       {post.type === 'boost' && (
