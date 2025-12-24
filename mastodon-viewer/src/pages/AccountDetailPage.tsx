@@ -80,7 +80,7 @@ export function AccountDetailPage() {
 
   return (
     <div className="h-full overflow-auto">
-      <div className="max-w-4xl mx-auto pb-10">
+      <div className="max-w-7xl mx-auto pb-10">
         {/* Back Button */}
         <div className="px-6 pt-4 pb-2">
           <button
@@ -154,20 +154,28 @@ export function AccountDetailPage() {
 
             {/* Stats Bar */}
             <div className="grid grid-cols-3 gap-4 border-t border-mastodon-border pt-6 pb-2">
-              <div className="flex flex-col items-center gap-2 p-4 bg-mastodon-bg rounded-lg">
-                <MessageSquare className="w-6 h-6 text-mastodon-primary" />
-                <span className="font-bold text-white text-2xl">{account.postsCount.toLocaleString()}</span>
-                <span className="text-mastodon-text-secondary text-sm">Posts</span>
+              <div className="flex flex-col items-center">
+                <div className="flex items-center gap-2 mb-1">
+                  <MessageSquare className="w-5 h-5 text-mastodon-text-secondary" />
+                  <span className="font-bold text-white text-2xl">{account.postsCount.toLocaleString()}</span>
+                </div>
+                <span className="text-mastodon-text-secondary text-sm uppercase tracking-wider font-medium">Posts</span>
               </div>
-              <div className="flex flex-col items-center gap-2 p-4 bg-mastodon-bg rounded-lg">
-                <Star className="w-6 h-6 text-[#e5c500]" />
-                <span className="font-bold text-white text-2xl">{account.likesCount.toLocaleString()}</span>
-                <span className="text-mastodon-text-secondary text-sm">Likes</span>
+              
+              <div className="flex flex-col items-center border-l border-mastodon-border">
+                <div className="flex items-center gap-2 mb-1">
+                  <Star className="w-5 h-5 text-[#e5c500]" />
+                  <span className="font-bold text-white text-2xl">{account.likesCount.toLocaleString()}</span>
+                </div>
+                <span className="text-mastodon-text-secondary text-sm uppercase tracking-wider font-medium">Likes</span>
               </div>
-              <div className="flex flex-col items-center gap-2 p-4 bg-mastodon-bg rounded-lg">
-                <Bookmark className="w-6 h-6 text-[#2b90d9]" />
-                <span className="font-bold text-white text-2xl">{account.bookmarksCount.toLocaleString()}</span>
-                <span className="text-mastodon-text-secondary text-sm">Bookmarks</span>
+              
+              <div className="flex flex-col items-center border-l border-mastodon-border">
+                <div className="flex items-center gap-2 mb-1">
+                  <Bookmark className="w-5 h-5 text-[#2b90d9]" />
+                  <span className="font-bold text-white text-2xl">{account.bookmarksCount.toLocaleString()}</span>
+                </div>
+                <span className="text-mastodon-text-secondary text-sm uppercase tracking-wider font-medium">Saved</span>
               </div>
             </div>
           </div>

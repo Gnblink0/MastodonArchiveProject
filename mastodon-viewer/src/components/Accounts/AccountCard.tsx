@@ -83,26 +83,34 @@ export function AccountCard({ account }: AccountCardProps) {
       </div>
 
       {/* Stats row */}
-      <div className="flex gap-6 mb-4">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="w-5 h-5 text-mastodon-text-secondary" />
-          <div>
-            <div className="text-xl font-bold text-white">{account.postsCount.toLocaleString()}</div>
-            <div className="text-xs text-mastodon-text-secondary">Posts</div>
+      <div className="grid grid-cols-3 gap-4 mb-4 border-t border-b border-mastodon-border py-4">
+        <div className="text-center group-hover/stat">
+          <div className="text-xl font-bold text-white mb-1 group-hover:text-mastodon-primary transition-colors">
+            {account.postsCount.toLocaleString()}
+          </div>
+          <div className="text-xs text-mastodon-text-secondary flex items-center justify-center gap-1.5 uppercase tracking-wider font-medium">
+            <MessageSquare className="w-3.5 h-3.5" />
+            Posts
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Star className="w-5 h-5 text-[#e5c500]" />
-          <div>
-            <div className="text-xl font-bold text-white">{account.likesCount.toLocaleString()}</div>
-            <div className="text-xs text-mastodon-text-secondary">Likes</div>
+        
+        <div className="text-center border-l border-mastodon-border">
+          <div className="text-xl font-bold text-white mb-1 group-hover:text-[#e5c500] transition-colors">
+            {account.likesCount.toLocaleString()}
+          </div>
+          <div className="text-xs text-mastodon-text-secondary flex items-center justify-center gap-1.5 uppercase tracking-wider font-medium">
+            <Star className="w-3.5 h-3.5" />
+            Likes
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Bookmark className="w-5 h-5 text-[#2b90d9]" />
-          <div>
-            <div className="text-xl font-bold text-white">{account.bookmarksCount.toLocaleString()}</div>
-            <div className="text-xs text-mastodon-text-secondary">Bookmarks</div>
+        
+        <div className="text-center border-l border-mastodon-border">
+          <div className="text-xl font-bold text-white mb-1 group-hover:text-[#2b90d9] transition-colors">
+            {account.bookmarksCount.toLocaleString()}
+          </div>
+          <div className="text-xs text-mastodon-text-secondary flex items-center justify-center gap-1.5 uppercase tracking-wider font-medium">
+            <Bookmark className="w-3.5 h-3.5" />
+            Saved
           </div>
         </div>
       </div>

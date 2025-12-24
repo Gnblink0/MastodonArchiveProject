@@ -281,7 +281,7 @@ function App() {
         leftSidebar={leftSidebarContent}
         onMobileMenuToggle={location.pathname !== '/' ? () => setMobileMenuOpen(true) : undefined}
         rightSidebar={
-           ['/stats', '/profile', '/favourites', '/bookmarks'].includes(location.pathname) ? undefined : (
+           ['/stats', '/profile', '/favourites', '/bookmarks', '/accounts'].includes(location.pathname) || location.pathname.startsWith('/account/') ? undefined : (
              selectedPostId ? (
                 <ThreadView
                   postId={selectedPostId}
