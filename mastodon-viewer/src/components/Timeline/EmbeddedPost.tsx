@@ -36,15 +36,22 @@ export function EmbeddedPost({ url, timestamp }: EmbeddedPostProps) {
         const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(oembedEndpoint)}`
         
         const response = await fetch(proxyUrl)
-        
+
         if (!response.ok) {
+          // Silently fail for 404s - many instances don't support oEmbed or posts are private
+          if (response.status === 404) {
+            setError(true)
+            setLoading(false)
+            return
+          }
           throw new Error(`Failed to fetch oEmbed: ${response.status}`)
         }
 
         const json = await response.json()
         setData(json)
       } catch (err) {
-        console.error('oEmbed fetch error:', err)
+        // Silently handle errors - many external posts don't support oEmbed
+        // No logging needed as this is expected behavior
         setError(true)
       } finally {
         setLoading(false)

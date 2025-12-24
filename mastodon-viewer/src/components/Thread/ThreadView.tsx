@@ -1,6 +1,6 @@
 
-import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useEffect, useState, useRef, useLayoutEffect } from 'react'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { db } from '../../lib/db'
 import type { Post } from '../../types'
 import { PostCard } from '../Timeline/PostCard'
@@ -21,11 +21,15 @@ export function ThreadView({ postId: propPostId, onClose }: ThreadViewProps) {
   const params = useParams<{ id: string }>()
   const initialId = propPostId || params.id
   const navigate = useNavigate()
+  const location = useLocation()
   const [focusedPostId, setFocusedPostId] = useState<string>(initialId || '')
   const [post, setPost] = useState<Post | null>(null)
   const [ancestors, setAncestors] = useState<Post[]>([])
   const [replyTree, setReplyTree] = useState<ThreadNode[]>([])
   const [loading, setLoading] = useState(true)
+  const focusedPostRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const hasScrolledRef = useRef(false)
 
   // Build reply tree recursively
   const buildReplyTree = async (postId: string, depth: number = 0): Promise<ThreadNode[]> => {
@@ -94,11 +98,33 @@ export function ThreadView({ postId: propPostId, onClose }: ThreadViewProps) {
         console.error('Error fetching thread:', error)
       } finally {
         setLoading(false)
+        hasScrolledRef.current = false // Reset scroll flag
       }
     }
 
     fetchThread()
   }, [focusedPostId])
+
+  // Scroll to focused post after content loads
+  useEffect(() => {
+    if (!loading && focusedPostRef.current && !hasScrolledRef.current) {
+      hasScrolledRef.current = true
+
+      // Use requestIdleCallback for smoother performance, fallback to setTimeout
+      const scroll = () => {
+        focusedPostRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        })
+      }
+
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(scroll, { timeout: 100 })
+      } else {
+        setTimeout(scroll, 0)
+      }
+    }
+  }, [loading, focusedPostId])
 
   if (loading) {
     return (
@@ -186,12 +212,30 @@ export function ThreadView({ postId: propPostId, onClose }: ThreadViewProps) {
     )
   }
 
+  const handleBack = () => {
+    // If onClose is provided (desktop sidebar mode), just close the panel
+    if (onClose) {
+      onClose()
+      return
+    }
+
+    // Otherwise, navigate back (mobile mode)
+    const state = location.state as { from?: string } | null
+    if (state?.from) {
+      // Navigate back to the saved location
+      navigate(state.from)
+    } else {
+      // Fallback to browser back
+      navigate(-1)
+    }
+  }
+
   return (
-    <div className="h-full flex flex-col">
+    <div ref={containerRef} className="h-full flex flex-col">
        <div className="p-4 border-b border-mastodon-border flex justify-between items-center bg-mastodon-surface/50 backdrop-blur sticky top-0 z-20">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate(-1)}
+              onClick={handleBack}
               className="flex items-center gap-2 text-mastodon-primary hover:text-mastodon-primary/80 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -251,12 +295,12 @@ export function ThreadView({ postId: propPostId, onClose }: ThreadViewProps) {
             )})}
 
             {/* Current Post - Highlighted/Expanded */}
-            <div className="relative group pb-4">
+            <div ref={focusedPostRef} className="relative group pb-4">
                 {/* Lines */}
                 {(ancestors.length > 0 || !!post.inReplyTo) && (
                     <div className="absolute left-[40px] top-0 h-[40px] w-[2px] bg-mastodon-border/30 -translate-x-1/2 z-0"></div>
                 )}
-                
+
                 {replyTree.length > 0 && (
                    <div className="absolute left-[40px] top-[40px] bottom-0 w-[2px] bg-mastodon-border/30 -translate-x-1/2 z-0"></div>
                 )}

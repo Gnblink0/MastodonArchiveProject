@@ -125,20 +125,11 @@ export function useMedia(mediaIds: string[]) {
       const mediaItems = await db.media.where('id').anyOf(mediaIds).toArray()
 
       // 从 Blob 重新生成 Object URL
-      return mediaItems.map(m => {
-        console.log('Media item debug:', {
-          id: m.id,
-          filename: m.filename,
-          type: m.type,
-          blobType: m.blob?.type,
-          blobSize: m.blob?.size,
-          hasBlob: !!m.blob
-        })
-        return {
+      return mediaItems.map(m => ({
           ...m,
           url: m.blob ? URL.createObjectURL(m.blob) : m.url
-        }
-      })
+        })
+      )
     },
     [mediaIds.join(',')]
   )

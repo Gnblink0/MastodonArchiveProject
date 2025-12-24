@@ -42,12 +42,6 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
-  useEffect(() => {
-    if (media && media.length > 0) {
-      console.log('PostCard media debug:', post.id, media)
-    }
-  }, [media, post.id])
-
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('zh-CN', {
       year: 'numeric',

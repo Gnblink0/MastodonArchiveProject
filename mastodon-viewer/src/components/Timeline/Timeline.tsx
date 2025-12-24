@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { PostCard } from './PostCard'
 import { usePostsCount } from '../../hooks/usePosts'
 import { Loader2, Search as SearchIcon, X, Menu, Calendar } from 'lucide-react'
@@ -23,6 +24,9 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
   // --- Account Filter from Global Context ---
   const { selectedAccountId } = useAccountFilter()
 
+  // --- URL Search Params for preserving jumped month ---
+  const [searchParams, setSearchParams] = useSearchParams()
+
   // --- States and Refs ---
   const { posts: timelinePosts, isLoading, hasMore, loadMore } = useInfiniteScrollPosts(selectedAccountId)
   const totalCountDB = usePostsCount(selectedAccountId)
@@ -46,6 +50,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
   const touchStartY = useRef<number>(0)
   const currentTouchY = useRef<number>(0)
   const pendingScrollToPost = useRef<string | null>(null) // Store post ID to scroll to
+  const hasRestoredScroll = useRef(false) // Track if we've already restored scroll position
 
   // --- Derived State (must be before virtualizer) ---
   const displayedPosts = query ? searchResults : (jumpedPosts || timelinePosts)
@@ -106,6 +111,114 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
   }, [jumpedPosts, isLoadingJumped, isRefreshing, rowVirtualizer])
 
   // --- Effects ---
+
+  // Effect to restore scroll position when returning from post detail
+  useLayoutEffect(() => {
+    if (displayedPosts.length > 0 && !hasRestoredScroll.current) {
+      const savedPostId = sessionStorage.getItem('timeline-scroll-post-id')
+      if (savedPostId) {
+        // Find the post index in displayedPosts
+        const postIndex = displayedPosts.findIndex(p => p.id === savedPostId)
+
+        if (postIndex >= 0) {
+          // Use requestAnimationFrame to wait for virtualizer to be ready
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              // Double RAF ensures virtualizer has measured elements
+              rowVirtualizer.scrollToIndex(postIndex, {
+                align: 'start',
+                behavior: 'auto'
+              })
+            })
+          })
+        }
+
+        // Clear the saved position and mark as restored
+        sessionStorage.removeItem('timeline-scroll-post-id')
+        hasRestoredScroll.current = true
+      }
+    }
+  }, [displayedPosts, rowVirtualizer])
+
+  // Reset scroll restoration flag when view changes (search, jump, or account filter)
+  useEffect(() => {
+    hasRestoredScroll.current = false
+  }, [query, jumpedPosts, selectedAccountId])
+
+  // Update cache whenever jumpedPosts changes (including when loading more)
+  useEffect(() => {
+    if (jumpedPosts && jumpedPosts.length > 0) {
+      const monthParam = searchParams.get('month')
+      if (monthParam) {
+        const cacheKey = `jumped-posts-${monthParam}-${selectedAccountId || 'all'}`
+        sessionStorage.setItem(cacheKey, JSON.stringify(jumpedPosts))
+      }
+    }
+  }, [jumpedPosts, searchParams, selectedAccountId])
+
+  // Effect to restore jumped month from URL params on mount
+  useEffect(() => {
+    const monthParam = searchParams.get('month')
+    if (monthParam && !query) {
+      // Parse month parameter (format: YYYY-MM)
+      const [yearStr, monthStr] = monthParam.split('-')
+      const year = parseInt(yearStr, 10)
+      const month = parseInt(monthStr, 10) - 1 // Month is 0-indexed in Date
+
+      if (!isNaN(year) && !isNaN(month)) {
+        // Try to restore from sessionStorage cache first for instant loading
+        const cacheKey = `jumped-posts-${monthParam}-${selectedAccountId || 'all'}`
+        const cached = sessionStorage.getItem(cacheKey)
+
+        if (cached) {
+          try {
+            const cachedPosts = JSON.parse(cached)
+            // Convert date strings back to Date objects
+            const restoredPosts = cachedPosts.map((p: any) => ({
+              ...p,
+              publishedAt: new Date(p.publishedAt)
+            }))
+            setJumpedPosts(restoredPosts)
+          } catch (e) {
+            console.error('Failed to restore from cache:', e)
+          }
+        }
+
+        // Restore jumped posts for this month (will update cache)
+        const loadMonthPosts = async () => {
+          const monthStart = new Date(year, month, 1).getTime()
+          const nextMonthStart = new Date(year, month + 1, 1).getTime()
+
+          try {
+            let monthPosts: Post[]
+            if (selectedAccountId) {
+              const allAccountPosts = await db.posts.where('accountId').equals(selectedAccountId).toArray()
+              monthPosts = allAccountPosts.filter(p => p.timestamp >= monthStart && p.timestamp < nextMonthStart)
+            } else {
+              monthPosts = await db.posts
+                .where('timestamp')
+                .between(monthStart, nextMonthStart, true, false)
+                .toArray()
+            }
+
+            if (monthPosts.length > 0) {
+              const sortedPosts = [...monthPosts]
+                .sort((a, b) => b.timestamp - a.timestamp)
+                .slice(0, 30)
+              setJumpedPosts(sortedPosts)
+              // Cache will be updated automatically by the effect
+            }
+          } catch (error) {
+            console.error('Failed to restore jumped month:', error)
+          }
+        }
+        loadMonthPosts()
+      }
+    } else if (!monthParam && jumpedPosts) {
+      // If month param is removed but we still have jumped posts, clear them
+      setJumpedPosts(null)
+    }
+  }, [searchParams, selectedAccountId, query]) // Run when URL params or account changes
 
   // Effect to restore scroll position after loading newer posts
   // Use useLayoutEffect to execute before browser paint, avoiding flicker
@@ -389,6 +502,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
   const handleSearch = (val: string) => {
     setQuery(val)
     setJumpedPosts(null) // Clear jumped posts when searching
+    setSearchParams({}) // Clear URL params when searching
   }
 
   const clearSearch = () => {
@@ -396,6 +510,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
     setSearchResults([])
     setIsSearching(false)
     setJumpedPosts(null)
+    setSearchParams({}) // Clear URL params
   }
 
   // Handle month click from timeline drawer
@@ -405,6 +520,10 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
       setSearchResults([])
       setIsSearching(false)
     }
+
+    // Update URL params to preserve the jumped month
+    const monthParam = `${year}-${String(month + 1).padStart(2, '0')}`
+    setSearchParams({ month: monthParam })
 
     const monthStart = new Date(year, month, 1).getTime()
     const nextMonthStart = new Date(year, month + 1, 1).getTime()
@@ -429,6 +548,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
           .slice(0, 30)
 
         setJumpedPosts(sortedPosts)
+        // Cache will be updated automatically by the effect
 
         // Give React a moment to render the new posts into the virtualizer
         setTimeout(() => {
@@ -537,7 +657,10 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
           <div className="text-sm text-mastodon-text-secondary text-center">
             Viewing {displayedPosts.length} posts from selected month
             <button
-              onClick={() => setJumpedPosts(null)}
+              onClick={() => {
+                setJumpedPosts(null)
+                setSearchParams({}) // Clear URL params when returning to timeline
+              }}
               className="ml-2 text-mastodon-primary hover:underline cursor-pointer"
             >
               Return to timeline
@@ -614,7 +737,11 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
                   <PostCard
                     post={post}
                     highlight={query}
-                    onClick={onPostClick ? () => onPostClick(post.id) : undefined}
+                    onClick={onPostClick ? () => {
+                      // Save the clicked post ID to restore scroll position when returning
+                      sessionStorage.setItem('timeline-scroll-post-id', post.id)
+                      onPostClick(post.id)
+                    } : undefined}
                   />
                 </div>
               )

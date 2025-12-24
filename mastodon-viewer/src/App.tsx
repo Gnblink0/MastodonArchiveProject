@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom'
 import { UploadZone } from './components/Upload/UploadZone'
 import { Timeline } from './components/Timeline/Timeline'
 import { ThreadView } from './components/Thread/ThreadView'
@@ -14,6 +14,28 @@ import { AccountFilterProvider } from './contexts/AccountFilterContext'
 import { db } from './lib/db'
 import { Home, Users, Trash2, BarChart3, X, Star, Bookmark, LogIn, LogOut, Loader2 } from 'lucide-react'
 import { useGoogleLogin } from '@react-oauth/google'
+
+// Wrapper component to handle desktop redirect for /post/:id
+function PostRouteHandler() {
+  const { id } = useParams<{ id: string }>()
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024)
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 1024)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // On desktop, redirect to home with the post ID as state
+  if (isDesktop) {
+    return <Navigate to="/" state={{ openPostId: id }} replace />
+  }
+
+  // On mobile, render ThreadView normally
+  return <ThreadView />
+}
 
 function App() {
   const [hasData, setHasData] = useState(false)
@@ -119,6 +141,16 @@ function App() {
     })
   }, [])
 
+  // Handle opening post from location state (when redirected from /post/:id on desktop)
+  useEffect(() => {
+    const state = location.state as { openPostId?: string } | null
+    if (state?.openPostId && window.innerWidth >= 1024) {
+      setSelectedPostId(state.openPostId)
+      // Clear the state to prevent reopening on future navigations
+      navigate(location.pathname + location.search, { replace: true, state: {} })
+    }
+  }, [location.state, location.pathname, location.search, navigate])
+
   const handleUploadComplete = () => {
     setHasData(true)
   }
@@ -154,7 +186,9 @@ function App() {
   const handlePostClick = (postId: string) => {
     // On mobile, navigate to thread page; on desktop, show in right sidebar
     if (window.innerWidth < 1024) { // lg breakpoint
-      navigate(`/post/${postId}`)
+      navigate(`/post/${postId}`, {
+        state: { from: location.pathname + location.search }
+      })
     } else {
       setSelectedPostId(postId)
     }
@@ -299,7 +333,7 @@ function App() {
       >
         <Routes>
            <Route path="/" element={<Timeline onPostClick={handlePostClick} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />} />
-           <Route path="/post/:id" element={<ThreadView />} />
+           <Route path="/post/:id" element={<PostRouteHandler />} />
            <Route path="/stats" element={<StatsPage />} />
            <Route path="/accounts" element={<AccountsPage googleUser={googleUser} googleLogin={googleLogin} googleAccessToken={googleAccessToken} />} />
            <Route path="/account/*" element={<AccountDetailPage />} />
