@@ -16,7 +16,7 @@ interface PostCardProps {
   showBorder?: boolean
 }
 
-export function PostCard({ post, onClick, highlight, showBorder = true }: PostCardProps) {
+export function PostCard({ post, onClick, highlight, showBorder = true, className = '' }: PostCardProps & { className?: string }) {
   // Logic to fetch boosted post if it's a boost
   const boostedPost = useLiveQuery(
     async () => {
@@ -128,9 +128,9 @@ export function PostCard({ post, onClick, highlight, showBorder = true }: PostCa
   return (
     <article
        onClick={handleCardClick}
-       className={`bg-mastodon-surface p-4 hover:bg-opacity-80 transition-colors cursor-pointer ${
+       className={`p-4 hover:bg-opacity-80 transition-colors cursor-pointer ${
          showBorder ? 'border-b border-mastodon-border first:rounded-t-md last:rounded-b-md' : 'rounded-md'
-       }`}
+       } ${className ? className : 'bg-mastodon-surface'}`}
     >
       {/* 转发标识 */}
       {post.type === 'boost' && (
@@ -146,10 +146,10 @@ export function PostCard({ post, onClick, highlight, showBorder = true }: PostCa
           <img
             src={actor.avatarUrl}
             alt={actor.displayName}
-            className="w-12 h-12 rounded-full shrink-0 object-cover"
+            className="w-12 h-12 rounded-full shrink-0 object-cover relative z-10 bg-mastodon-surface"
           />
         ) : (
-          <div className="w-12 h-12 rounded-full bg-mastodon-border shrink-0" />
+          <div className="w-12 h-12 rounded-full bg-mastodon-border shrink-0 relative z-10" />
         )}
 
         <div className="flex-1 min-w-0">
