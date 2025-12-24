@@ -1,7 +1,8 @@
+
 import { ExternalLink, Reply } from 'lucide-react'
 import type { Post } from '../../types'
 import { useMedia, useAccount } from '../../hooks/usePosts'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../lib/db'
 import Lightbox from 'yet-another-react-lightbox'

@@ -1,5 +1,4 @@
-
-import { useEffect, useState, useRef, useLayoutEffect } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { db } from '../../lib/db'
 import type { Post } from '../../types'
