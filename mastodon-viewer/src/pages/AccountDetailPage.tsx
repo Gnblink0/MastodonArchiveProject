@@ -62,6 +62,19 @@ export function AccountDetailPage() {
     )
   }
 
+  // Extract instance domain from account ID
+  const getInstanceDomain = (accountId: string): string => {
+    try {
+      const url = new URL(accountId)
+      return url.hostname
+    } catch {
+      return ''
+    }
+  }
+
+  const instanceDomain = getInstanceDomain(account.id)
+  const fullHandle = instanceDomain ? `@${account.preferredUsername}@${instanceDomain}` : `@${account.preferredUsername}`
+
   // Format date
   const joinDate = new Intl.DateTimeFormat('en-US', {
     month: 'long',
@@ -126,7 +139,7 @@ export function AccountDetailPage() {
             <div>
               <h1 className="text-3xl font-bold text-white mb-1">{account.displayName}</h1>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <p className="text-mastodon-text-secondary text-lg">@{account.preferredUsername}</p>
+                <p className="text-mastodon-text-secondary text-lg">{fullHandle}</p>
                 <div className="flex items-center gap-1.5 text-mastodon-text-secondary text-sm bg-white/5 px-2 py-0.5 rounded-full">
                   <Calendar className="w-3.5 h-3.5" />
                   <span>Joined {joinDate}</span>

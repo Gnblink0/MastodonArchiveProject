@@ -46,7 +46,7 @@ function shadeColor(color: string, percent: number): string {
 export async function loadSampleData(): Promise<void> {
   try {
     // Create sample account
-    const accountId = 'https://mastodon.example/users/sample'
+    const accountId = 'https://mastodon.social/users/sample_user'
     const now = new Date()
 
     // Generate avatar and header images
@@ -83,6 +83,7 @@ export async function loadSampleData(): Promise<void> {
         publishedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7), // 7 days ago
         timestamp: Date.now() - 1000 * 60 * 60 * 24 * 7,
         tags: ['welcome', 'mastodon'],
+        emojis: [],
         mentions: [],
         mediaIds: [],
         sensitive: false,
@@ -97,6 +98,7 @@ export async function loadSampleData(): Promise<void> {
         publishedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5), // 5 days ago
         timestamp: Date.now() - 1000 * 60 * 60 * 24 * 5,
         tags: ['privacy', 'security', 'opensource'],
+        emojis: [],
         mentions: [],
         mediaIds: [],
         sensitive: false,
@@ -111,6 +113,7 @@ export async function loadSampleData(): Promise<void> {
         publishedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3), // 3 days ago
         timestamp: Date.now() - 1000 * 60 * 60 * 24 * 3,
         tags: ['photography', 'gallery'],
+        emojis: [],
         mentions: [],
         mediaIds: ['media-1', 'media-2', 'media-3'],
         sensitive: false,
@@ -125,6 +128,7 @@ export async function loadSampleData(): Promise<void> {
         publishedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), // 2 days ago
         timestamp: Date.now() - 1000 * 60 * 60 * 24 * 2,
         tags: ['threads'],
+        emojis: [],
         mentions: [],
         mediaIds: [],
         sensitive: false,
@@ -139,6 +143,7 @@ export async function loadSampleData(): Promise<void> {
         publishedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2 + 1000 * 60 * 30), // 2 days ago + 30 min
         timestamp: Date.now() - 1000 * 60 * 60 * 24 * 2 + 1000 * 60 * 30,
         tags: ['threads'],
+        emojis: [],
         mentions: [],
         mediaIds: [],
         inReplyTo: `${accountId}/statuses/4`,
@@ -154,6 +159,7 @@ export async function loadSampleData(): Promise<void> {
         publishedAt: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
         timestamp: Date.now() - 1000 * 60 * 60 * 24,
         tags: ['features', 'list'],
+        emojis: [],
         mentions: [],
         mediaIds: [],
         sensitive: false,
@@ -168,6 +174,7 @@ export async function loadSampleData(): Promise<void> {
         publishedAt: new Date(Date.now() - 1000 * 60 * 60 * 12), // 12 hours ago
         timestamp: Date.now() - 1000 * 60 * 60 * 12,
         tags: ['cw', 'example'],
+        emojis: [],
         mentions: [],
         mediaIds: [],
         sensitive: true,
@@ -183,6 +190,7 @@ export async function loadSampleData(): Promise<void> {
         publishedAt: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
         timestamp: Date.now() - 1000 * 60 * 60 * 6,
         tags: ['mentions'],
+        emojis: [],
         mentions: [{ name: '@someone', url: 'https://mastodon.social/@someone' }],
         mediaIds: [],
         sensitive: false,
@@ -197,6 +205,7 @@ export async function loadSampleData(): Promise<void> {
         publishedAt: new Date(Date.now() - 1000 * 60 * 60), // 1 hour ago
         timestamp: Date.now() - 1000 * 60 * 60,
         tags: ['getstarted'],
+        emojis: [],
         mentions: [],
         mediaIds: [],
         sensitive: false,
@@ -211,6 +220,7 @@ export async function loadSampleData(): Promise<void> {
         publishedAt: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
         timestamp: Date.now() - 1000 * 60 * 30,
         tags: ['preview', 'demo'],
+        emojis: [],
         mentions: [],
         mediaIds: [],
         sensitive: false,
@@ -300,13 +310,13 @@ export async function loadSampleData(): Promise<void> {
 
 // Function to check if sample data already exists
 export async function hasSampleData(): Promise<boolean> {
-  const sampleAccount = await db.accounts.get('https://mastodon.example/users/sample')
+  const sampleAccount = await db.accounts.get('https://mastodon.social/users/sample_user')
   return !!sampleAccount
 }
 
 // Function to remove sample data
 export async function removeSampleData(): Promise<void> {
-  const sampleAccountId = 'https://mastodon.example/users/sample'
+  const sampleAccountId = 'https://mastodon.social/users/sample_user'
   await db.clearAccount(sampleAccountId)
   console.log('Sample data removed successfully!')
 }

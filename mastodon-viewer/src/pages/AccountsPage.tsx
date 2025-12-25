@@ -16,6 +16,21 @@ export function AccountsPage({ googleUser, googleLogin, googleAccessToken }: Acc
   const [showUploadModal, setShowUploadModal] = useState(false)
   const { selectedAccountId, setSelectedAccountId } = useAccountFilter()
 
+  // Extract instance domain from account ID
+  const getInstanceDomain = (accountId: string): string => {
+    try {
+      const url = new URL(accountId)
+      return url.hostname
+    } catch {
+      return ''
+    }
+  }
+
+  const getFullHandle = (account: typeof accounts[0]): string => {
+    const instanceDomain = getInstanceDomain(account.id)
+    return instanceDomain ? `@${account.preferredUsername}@${instanceDomain}` : `@${account.preferredUsername}`
+  }
+
   const handleAddAccount = () => {
     setShowUploadModal(true)
   }
@@ -86,7 +101,7 @@ export function AccountsPage({ googleUser, googleLogin, googleAccessToken }: Acc
                       className="w-5 h-5 rounded-full"
                     />
                   )}
-                  @{account.preferredUsername}
+                  {getFullHandle(account)}
                 </button>
               ))}
             </div>

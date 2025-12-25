@@ -12,10 +12,23 @@ export function AccountCard({ account }: AccountCardProps) {
   const navigate = useNavigate()
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // Extract instance domain from account ID (e.g., https://mastodon.social/users/username -> mastodon.social)
+  const getInstanceDomain = (accountId: string): string => {
+    try {
+      const url = new URL(accountId)
+      return url.hostname
+    } catch {
+      return ''
+    }
+  }
+
+  const instanceDomain = getInstanceDomain(account.id)
+  const fullHandle = instanceDomain ? `@${account.preferredUsername}@${instanceDomain}` : `@${account.preferredUsername}`
+
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation() // 防止触发卡片点击
 
-    if (!confirm(`Are you sure you want to delete all data for @${account.preferredUsername}? This cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to delete all data for ${fullHandle}? This cannot be undone.`)) {
       return
     }
 
@@ -78,7 +91,7 @@ export function AccountCard({ account }: AccountCardProps) {
           <h3 className="text-xl font-bold text-white truncate group-hover:text-mastodon-primary transition-colors">
             {account.displayName}
           </h3>
-          <p className="text-mastodon-text-secondary truncate">@{account.preferredUsername}</p>
+          <p className="text-mastodon-text-secondary truncate">{fullHandle}</p>
         </div>
       </div>
 
