@@ -32,6 +32,14 @@ export interface Account {
   bookmarksCount: number  // 该账号的书签数
 }
 
+// 12.25 新增emoji接口
+export interface CustomEmoji {
+  shortcode: string
+  url: string
+  static_url?: string
+  visible_in_picker?: boolean
+}
+
 export interface ActorField {
   name: string
   value: string
@@ -47,6 +55,7 @@ export interface Post {
   publishedAt: Date
   timestamp: number // Unix 时间戳（用于排序）
   tags: string[]
+  emojis: CustomEmoji[]   // <--- 新增：这里加上表情包字段！
   mentions: Array<{ name: string, url: string }>
   mediaIds: string[]
   inReplyTo?: string

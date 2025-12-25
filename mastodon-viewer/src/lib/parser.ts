@@ -395,9 +395,17 @@ export class ArchiveParser {
         }
 
         // Extract Mentions
-        const mentions = obj.tag?.filter(t => t.type === 'Mention').map(t => ({ // Fix: t.type casing might vary, usually 'Mention'
+        const mentions = obj.tag?.filter(t => t.type === 'Mention').map(t => ({
              name: t.name || '',
              url: t.href || ''
+        })) || []
+
+        // ✨ 新增：提取自定义表情 (Emoji)
+        // 注意：这里用了 (t: any) 是为了防止报错，因为标准类型里可能没有 icon 字段
+        const emojis = obj.tag?.filter(t => t.type === 'Emoji').map((t: any) => ({
+             shortcode: t.name?.replace(/:/g, '') || '', // 去掉名字前后的冒号
+             url: t.icon?.url || t.href || '',           // 优先使用 icon.url
+             static_url: t.icon?.url || t.href || ''
         })) || []
 
         posts.push({
@@ -410,6 +418,7 @@ export class ArchiveParser {
           timestamp: new Date(obj.published).getTime(),
           tags: obj.tag?.filter(t => t.type === 'Hashtag')
                        .map(t => t.name?.replace('#', '') || '') || [],
+          emojis, // <--- ✨ 把提取到的表情包放进这里！
           mentions,
           mediaIds: obj.attachment?.map(a => {
             // Simple helper to get filename from URL
@@ -455,6 +464,7 @@ export class ArchiveParser {
           timestamp: new Date(item.published).getTime(),
           tags: [],
           mentions: [],
+          emojis: [],       // <--- 🚨 在这里加上这一行！(转发通常没有自己的表情，给个空数组即可)
           mediaIds: [],
           sensitive: false,
           visibility: 'public', // Boosts are usually public

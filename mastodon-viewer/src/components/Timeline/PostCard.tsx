@@ -1,4 +1,3 @@
-
 import { ExternalLink, Reply } from 'lucide-react'
 import type { Post } from '../../types'
 import { useMedia, useAccount } from '../../hooks/usePosts'
@@ -15,17 +14,16 @@ interface PostCardProps {
   highlight?: string
   onClick?: () => void
   showBorder?: boolean
+  className?: string
 }
 
-export function PostCard({ post, onClick, highlight, showBorder = true, className = '' }: PostCardProps & { className?: string }) {
+export function PostCard({ post, onClick, highlight, showBorder = true, className = '' }: PostCardProps) {
+  // 侦探代码：看看控制台里有没有打印出 emojis 数组
+  console.log('当前帖子数据:', post.id, (post as any).emojis);
   // Logic to fetch boosted post if it's a boost
   const boostedPost = useLiveQuery(
     async () => {
       if (post.type !== 'boost' || !post.boostedPostId) return null
-      // Try to find the local post if it exists
-      // The boostedPostId might be a URL or an ID. Our DB stores IDs mainly.
-      // Parser stored extraction of ID from URL in `id` field.
-      // So detailed logic: try to find a post where id matches the extracted ID from boostedPostId
       const idPart = post.boostedPostId.split('/').pop()
       if (!idPart) return null
       return db.posts.get(idPart)
@@ -34,9 +32,6 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
   )
 
   const displayPost = boostedPost || post
-  // If it's a boost but we found the original, use the original's media/content
-  // BUT we keep the "Boosted by" header from the wrapper post
-
   const media = useMedia(displayPost.mediaIds)
   const actor = useAccount(post.accountId)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -54,26 +49,20 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
   }
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // If clicking on a link, button, video, or image, don't trigger card click
     const target = e.target as HTMLElement
     if (target.closest('a') || target.closest('button') || target.closest('video') || target.closest('img')) {
       return
     }
-
-    // Call the onClick callback to show post in right panel
     onClick?.()
   }
 
   const handleImageClick = (mediaIndex: number) => {
-    // Calculate the index in the images-only array
-    // Count how many images come before this index
     let imageIndex = 0
     for (let i = 0; i < mediaIndex; i++) {
       if (media?.[i]?.type === 'image') {
         imageIndex++
       }
     }
-
     setLightboxIndex(imageIndex)
     setLightboxOpen(true)
   }
@@ -81,38 +70,61 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
   // Content cleaner helper
   const cleanContent = (content: string) => {
     if (!content) return content
-    // Remove trailing hashtag links
-    // Matches <a ...>#tag</a> followed by optional whitespace at the end of string
-    // We execute this in a loop to remove multiple trailing tags
     let cleaned = content
     const tagRegex = /(?:<p>)?\s*<a [^>]*class="[^"]*hashtag[^"]*"[^>]*>#[^<]+<\/a>\s*(?:<\/p>)?\s*$/i
-    
     while (tagRegex.test(cleaned)) {
       cleaned = cleaned.replace(tagRegex, '')
     }
-    
     return cleaned
+  }
+
+  /**
+   * 新增：自定义表情替换函数
+   * 将 :shortcode: 替换为 <img /> 标签
+   */
+  const replaceCustomEmojis = (content: string, emojis: any[]) => {
+    if (!content || !emojis || emojis.length === 0) return content
+
+    let newContent = content
+    emojis.forEach((emoji) => {
+      const shortcode = `:${emoji.shortcode}:`
+      // 使用内联样式确保表情大小和文字一致
+      const imgTag = `<img 
+        src="${emoji.url}" 
+        alt="${emoji.shortcode}" 
+        title="${emoji.shortcode}" 
+        class="custom-emoji" 
+        style="height: 1.3em; width: auto; vertical-align: middle; display: inline-block; object-fit: contain; margin: 0 2px;" 
+      />`
+      
+      // 全局替换
+      newContent = newContent.split(shortcode).join(imgTag)
+    })
+
+    return newContent
   }
 
   const getHighlightedContent = (content: string, term?: string) => {
     const cleanedContent = cleanContent(content)
-    
-    if (!term || !term.trim()) return cleanedContent
-    
-    try {
-      // Escape special regex characters
-      const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      // Match the term only if it's NOT inside an HTML tag
-      const regex = new RegExp(`(${escapedTerm})(?![^<]*>)`, 'gi')
-      
-      return cleanedContent.replace(regex, '<mark class="bg-yellow-500/30 text-white rounded-sm px-0.5 font-bold">$1</mark>')
-    } catch (e) {
-      console.error('Highlight error', e)
-      return cleanedContent
+    let finalContent = cleanedContent
+
+    // 1. 先处理高亮
+    if (term && term.trim()) {
+      try {
+        const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const regex = new RegExp(`(${escapedTerm})(?![^<]*>)`, 'gi')
+        finalContent = cleanedContent.replace(regex, '<mark class="bg-yellow-500/30 text-white rounded-sm px-0.5 font-bold">$1</mark>')
+      } catch (e) {
+        console.error('Highlight error', e)
+      }
     }
+
+    // 2. 最后处理 Emoji 替换 (确保高亮逻辑不会破坏 img 标签)
+    // 使用 (displayPost as any) 是为了防止类型定义中缺少 emojis 字段导致报错
+    const emojis = (displayPost as any).emojis || []
+    return replaceCustomEmojis(finalContent, emojis)
   }
 
-  // Lightbox slides
   const slides = media
     ?.filter(m => m.type === 'image')
     .map(m => ({
@@ -127,7 +139,6 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
          showBorder ? 'border-b border-mastodon-border first:rounded-t-md last:rounded-b-md' : 'rounded-md'
        } ${className ? className : 'bg-mastodon-surface'}`}
     >
-      {/* 转发标识 */}
       {post.type === 'boost' && (
         <div className="mb-2 text-sm text-mastodon-text-secondary flex items-center gap-2 pl-12">
           <span>🔄</span>
@@ -136,7 +147,6 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
       )}
 
       <div className="flex gap-3">
-        {/* 用户头像 */}
         {actor?.avatarUrl ? (
           <img
             src={actor.avatarUrl}
@@ -148,7 +158,6 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
         )}
 
         <div className="flex-1 min-w-0">
-           {/* Header: Name and Time */}
            <div className="flex justify-between items-start mb-2">
               <div className="flex flex-col min-w-0 mr-2">
                  <span className="font-bold text-white text-base leading-snug truncate">{actor?.displayName || 'Me'}</span>
@@ -167,8 +176,6 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
               </div>
            </div>
 
-
-          {/* CW 警告 */}
           {displayPost.summary && (
             <div className="mb-3 p-3 bg-mastodon-bg border border-mastodon-border rounded flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -186,7 +193,7 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
             </div>
           )}
 
-          {/* 帖子内容 - Use displayPost instead of post */}
+          {/* 渲染内容 */}
           {displayPost.content && (!displayPost.summary || isExpanded) && (
             <div
               className="prose prose-invert prose-sm max-w-none mb-3 text-mastodon-text-primary leading-snug break-words overflow-hidden"
@@ -194,14 +201,12 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
             />
           )}
 
-          {/* Fallback for external boosts without content */}
           {post.type === 'boost' && !boostedPost && post.boostedPostId && (
               <div className="mb-3">
                  <EmbeddedPost url={post.boostedPostId} />
               </div>
           )}
 
-          {/* 媒体附件 */}
           {media && media.length > 0 && (!displayPost.summary || isExpanded) && (
             <div className={`grid gap-2 mb-3 mt-3 rounded-lg overflow-hidden ${
               media.length === 1 ? 'grid-cols-1' :
@@ -232,7 +237,6 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
             </div>
           )}
 
-          {/* 标签 */}
           {displayPost.tags.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3">
               {displayPost.tags.map((tag, index) => (
@@ -246,7 +250,6 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
             </div>
           )}
 
-          {/* Footer Actions */}
           <div className="flex items-center justify-between mt-4 text-xs text-mastodon-text-secondary">
              <div className="flex items-center gap-4">
                 {displayPost.inReplyTo && (
@@ -279,7 +282,6 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
         </div>
       </div>
 
-      {/* Lightbox for images */}
       {slides.length > 0 && (
         <Lightbox
           open={lightboxOpen}
