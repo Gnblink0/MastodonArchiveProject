@@ -1,7 +1,8 @@
 import { useCallback, useState, useEffect } from 'react'
-import { Upload, FileArchive, Loader2, Cloud, ArrowRight } from 'lucide-react'
+import { Upload, FileArchive, Loader2, Cloud, ArrowRight, Eye } from 'lucide-react'
 import { ArchiveParser } from '../../lib/parser'
 import { ImportStrategyDialog } from './ImportStrategyDialog'
+import { loadSampleData } from '../../lib/sampleData'
 import type { ParseProgress, ImportStrategy, AccountConflict } from '../../types'
 
 interface UploadZoneProps {
@@ -14,6 +15,7 @@ interface UploadZoneProps {
 export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAccessToken }: UploadZoneProps) {
   const [uploading, setUploading] = useState(false)
   const [driveLoading, setDriveLoading] = useState(false)
+  const [loadingSample, setLoadingSample] = useState(false)
   const [progress, setProgress] = useState<ParseProgress | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [driveStatus, setDriveStatus] = useState<string>('')
@@ -340,16 +342,31 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
     if (file) handleFile(file)
   }, [handleFile])
 
+  const handleLoadSample = useCallback(async () => {
+    setLoadingSample(true)
+    setError(null)
+
+    try {
+      await loadSampleData()
+      onUploadComplete()
+    } catch (err) {
+      console.error('Failed to load sample data:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load sample data')
+    } finally {
+      setLoadingSample(false)
+    }
+  }, [onUploadComplete])
+
   const renderCentralContent = () => {
-    if (uploading) {
+    if (uploading || loadingSample) {
         return (
           <div className="space-y-6">
             <Loader2 className="w-20 h-20 mx-auto animate-spin text-mastodon-primary" />
             <div>
               <p className="text-xl font-medium text-white mb-3">
-                {progress?.stage || 'Processing...'}
+                {loadingSample ? 'Loading sample data...' : (progress?.stage || 'Processing...')}
               </p>
-              {progress && progress.total > 0 && (
+              {!loadingSample && progress && progress.total > 0 && (
                 <div className="mt-4 space-y-3 max-w-md mx-auto">
                   <p className="text-sm text-mastodon-text-secondary">
                     {progress.progress} / {progress.total}
@@ -408,16 +425,25 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
                 or click to select file
               </p>
             </div>
-            <label className="inline-flex items-center gap-3 px-8 py-4 bg-mastodon-primary text-white rounded-lg cursor-pointer hover:bg-mastodon-primary-hover transition-colors font-semibold text-base">
-              <Upload className="w-5 h-5" />
-              Select File
-              <input
-                type="file"
-                accept=".zip,application/zip,.tar.gz,application/gzip,application/x-gzip,.tgz"
-                className="hidden"
-                onChange={handleChange}
-              />
-            </label>
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-center">
+              <label className="inline-flex items-center gap-3 px-8 py-4 bg-mastodon-primary text-white rounded-lg cursor-pointer hover:bg-mastodon-primary-hover transition-colors font-semibold text-base">
+                <Upload className="w-5 h-5" />
+                Select File
+                <input
+                  type="file"
+                  accept=".zip,application/zip,.tar.gz,application/gzip,application/x-gzip,.tgz"
+                  className="hidden"
+                  onChange={handleChange}
+                />
+              </label>
+              <button
+                onClick={handleLoadSample}
+                className="inline-flex items-center gap-3 px-8 py-4 bg-mastodon-surface border-2 border-mastodon-primary/30 text-mastodon-primary rounded-lg cursor-pointer hover:border-mastodon-primary hover:bg-mastodon-primary/10 transition-all font-semibold text-base"
+              >
+                <Eye className="w-5 h-5" />
+                Preview Sample
+              </button>
+            </div>
             <p className="text-sm text-mastodon-text-secondary mt-6">
               Supports .zip and .tar.gz archives exported from Mastodon
             </p>
