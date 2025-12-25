@@ -4,6 +4,7 @@ import { AccountCard } from '../components/Accounts/AccountCard'
 import { UploadModal } from '../components/Upload/UploadModal'
 import { Users, Upload } from 'lucide-react'
 import { useAccountFilter } from '../contexts/AccountFilterContext'
+import type { Account } from '../types'
 
 interface AccountsPageProps {
   googleUser?: any
@@ -26,7 +27,7 @@ export function AccountsPage({ googleUser, googleLogin, googleAccessToken }: Acc
     }
   }
 
-  const getFullHandle = (account: typeof accounts[0]): string => {
+  const getFullHandle = (account: Account): string => {
     const instanceDomain = getInstanceDomain(account.id)
     return instanceDomain ? `@${account.preferredUsername}@${instanceDomain}` : `@${account.preferredUsername}`
   }
