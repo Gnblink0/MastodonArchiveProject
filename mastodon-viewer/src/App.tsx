@@ -10,9 +10,11 @@ import { ProfilePage } from './pages/ProfilePage'
 import { AccountsPage } from './pages/AccountsPage'
 import { AccountDetailPage } from './pages/AccountDetailPage'
 import { InteractionsPage } from './pages/InteractionsPage'
+import { MemoriesPage } from './pages/MemoriesPage'
 import { AccountFilterProvider } from './contexts/AccountFilterContext'
 import { db } from './lib/db'
-import { Home, Users, Trash2, BarChart3, X, Star, Bookmark, LogIn, LogOut, Loader2 } from 'lucide-react'
+// ↓ 在下面这行里加上 History
+import { Home, Users, Trash2, BarChart3, X, Star, Bookmark, LogIn, LogOut, Loader2, History } from 'lucide-react'
 import { useGoogleLogin } from '@react-oauth/google'
 
 // Wrapper component to handle desktop redirect for /post/:id
@@ -243,6 +245,14 @@ function App() {
             <span className="text-lg">Bookmarks</span>
          </button>
 
+         <button 
+            onClick={() => { navigate('/memories'); setMobileMenuOpen(false) }}
+            className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
+         >
+            <History className="w-6 h-6" />
+            <span className="text-lg">Memories</span>
+         </button>
+
       </nav>
 
       <div className="px-6 pt-4 pb-24 mt-auto border-t border-mastodon-border/50">
@@ -340,6 +350,7 @@ function App() {
            <Route path="/profile" element={<ProfilePage />} />
            <Route path="/favourites" element={<InteractionsPage type="likes" />} />
            <Route path="/bookmarks" element={<InteractionsPage type="bookmarks" />} />
+           <Route path="/memories" element={<MemoriesPage onPostClick={handlePostClick} />} />
            <Route path="/debug" element={<DebugDashboard />} />
         </Routes>
       </MainLayout>
