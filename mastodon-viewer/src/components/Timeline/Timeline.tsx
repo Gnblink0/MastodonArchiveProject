@@ -11,6 +11,7 @@ import { useInfiniteScrollPosts } from '../../hooks/useInfiniteScroll'
 import { ScrollToTopButton } from './ScrollToTopButton'
 import { TimelineDrawer } from './TimelineDrawer'
 import { useAccountFilter } from '../../contexts/AccountFilterContext'
+import { useTranslation } from 'react-i18next'
 
 interface TimelineProps {
   onPostClick?: (postId: string) => void
@@ -21,6 +22,7 @@ interface TimelineProps {
 }
 
 export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineProps) {
+  const { t } = useTranslation()
   // --- Account Filter from Global Context ---
   const { selectedAccountId } = useAccountFilter()
 
@@ -601,7 +603,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
                 type="text"
                 value={query}
                 onChange={(e) => handleSearch(e.target.value)}
-                placeholder="Search posts..."
+                placeholder={t('common.search_placeholder')}
                 className="w-full bg-transparent border-none py-4 px-4 text-mastodon-text-primary placeholder:text-mastodon-text-secondary/50 focus:outline-none focus:ring-0 text-base"
               />
               {query && (
@@ -628,7 +630,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
       {/* Posts count indicator */}
       {!query && !jumpedPosts && totalCountDB && (
         <div className="px-4 pb-2 text-sm text-mastodon-text-secondary text-center">
-          Loaded {displayedPosts.length} of {totalCountDB} posts
+          {t('timeline.loaded_x_of_y', { count: displayedPosts.length, total: totalCountDB })}
         </div>
       )}
 
@@ -645,17 +647,17 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
                 {isLoadingJumped || isRefreshing ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Loading...</span>
+                    <span>{t('common.loading')}</span>
                   </>
                 ) : (
-                  <span>Load earlier posts</span>
+                  <span>{t('timeline.load_earlier')}</span>
                 )}
               </button>
             </div>
           )}
 
           <div className="text-sm text-mastodon-text-secondary text-center">
-            Viewing {displayedPosts.length} posts from selected month
+            {t('timeline.viewing_month', { count: displayedPosts.length })}
             <button
               onClick={() => {
                 setJumpedPosts(null)
@@ -663,7 +665,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
               }}
               className="ml-2 text-mastodon-primary hover:underline cursor-pointer"
             >
-              Return to timeline
+              {t('timeline.return_to_timeline')}
             </button>
           </div>
         </div>
@@ -671,7 +673,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
 
       {query && (
         <div className="px-4 pb-2 text-sm text-mastodon-text-secondary text-center">
-          {isSearching ? 'Searching...' : `Found ${searchResults.length} results`}
+          {isSearching ? t('timeline.searching') : t('timeline.found_results', { count: searchResults.length })}
         </div>
       )}
 
@@ -704,7 +706,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
 
         {displayedPosts.length === 0 ? (
           <div className="text-center py-12 text-mastodon-text-secondary">
-            {query ? 'Try different keywords' : 'No posts in archive'}
+            {query ? t('timeline.try_different_keywords') : t('timeline.no_posts_in_archive')}
           </div>
         ) : (
           <div
@@ -773,7 +775,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
                 }}
                 className="text-center py-8 text-mastodon-text-secondary text-sm"
               >
-                You've reached the end of your timeline
+                {t('timeline.end_of_timeline')}
               </div>
             )}
           </div>

@@ -14,8 +14,9 @@ import { MemoriesPage } from './pages/MemoriesPage'
 import { AccountFilterProvider } from './contexts/AccountFilterContext'
 import { db } from './lib/db'
 // ↓ 在下面这行里加上 History
-import { Home, Users, Trash2, BarChart3, X, Star, Bookmark, LogIn, LogOut, Loader2, History } from 'lucide-react'
+import { Home, Users, Trash2, BarChart3, X, Star, Bookmark, LogIn, LogOut, Loader2, History, Languages } from 'lucide-react'
 import { useGoogleLogin } from '@react-oauth/google'
+import { useTranslation } from 'react-i18next'
 
 // Wrapper component to handle desktop redirect for /post/:id
 function PostRouteHandler() {
@@ -40,12 +41,18 @@ function PostRouteHandler() {
 }
 
 function App() {
+  const { t, i18n } = useTranslation()
   const [hasData, setHasData] = useState(false)
   const [loading, setLoading] = useState(true)
   const [selectedPostId, setSelectedPostId] = useState<string | undefined>(undefined)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+
+  const toggleLanguage = () => {
+    const nextLang = i18n.language.startsWith('zh') ? 'en' : 'zh'
+    i18n.changeLanguage(nextLang)
+  }
 
   // Google OAuth states
   const [googleUser, setGoogleUser] = useState<any>(null)
@@ -162,7 +169,7 @@ function App() {
       <div className="min-h-screen bg-mastodon-bg flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-mastodon-primary mx-auto" />
-          <p className="mt-4 text-mastodon-text-secondary">Loading...</p>
+          <p className="mt-4 text-mastodon-text-secondary">{t('common.loading')}</p>
         </div>
       </div>
     )
@@ -172,8 +179,8 @@ function App() {
     return (
       <div className="min-h-screen bg-mastodon-bg text-mastodon-text-primary">
          <header className="pt-12 text-center">
-            <h1 className="text-3xl font-bold text-white mb-2">Mastodon Archive Viewer</h1>
-            <p className="text-mastodon-text-secondary">Upload your archive to browse your history</p>
+            <h1 className="text-3xl font-bold text-white mb-2">Mastodon {t('common.archive_viewer')}</h1>
+            <p className="text-mastodon-text-secondary">{t('common.upload_history')}</p>
          </header>
          <UploadZone 
             onUploadComplete={handleUploadComplete} 
@@ -200,7 +207,7 @@ function App() {
     <div className="space-y-6 flex flex-col h-full">
       <div className="px-6 py-4 cursor-pointer" onClick={() => { navigate('/'); setMobileMenuOpen(false) }}>
          <h1 className="text-xl font-bold text-white">Mastodon</h1>
-         <p className="text-sm text-mastodon-text-secondary">Archive Viewer</p>
+         <p className="text-sm text-mastodon-text-secondary">{t('common.archive_viewer')}</p>
       </div>
 
       <nav className="flex flex-col space-y-2 px-4 flex-1">
@@ -209,7 +216,7 @@ function App() {
            className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
          >
            <Home className="w-6 h-6" />
-           <span className="text-lg">Home</span>
+           <span className="text-lg">{t('nav.home')}</span>
          </button>
 
          <button 
@@ -217,7 +224,7 @@ function App() {
             className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
          >
             <BarChart3 className="w-6 h-6" />
-            <span className="text-lg">Statistics</span>
+            <span className="text-lg">{t('nav.stats')}</span>
          </button>
 
          <button
@@ -225,7 +232,7 @@ function App() {
             className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
          >
             <Users className="w-6 h-6" />
-            <span className="text-lg">Accounts</span>
+            <span className="text-lg">{t('nav.accounts')}</span>
          </button>
 
 
@@ -234,7 +241,7 @@ function App() {
             className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
          >
             <Star className="w-6 h-6" />
-            <span className="text-lg">Favourites</span>
+            <span className="text-lg">{t('nav.favourites')}</span>
          </button>
 
          <button 
@@ -242,7 +249,7 @@ function App() {
             className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
          >
             <Bookmark className="w-6 h-6" />
-            <span className="text-lg">Bookmarks</span>
+            <span className="text-lg">{t('nav.bookmarks')}</span>
          </button>
 
          <button 
@@ -250,21 +257,29 @@ function App() {
             className="flex items-center gap-4 px-4 py-3 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
          >
             <History className="w-6 h-6" />
-            <span className="text-lg">Memories</span>
+            <span className="text-lg">{t('nav.memories')}</span>
          </button>
 
       </nav>
 
       <div className="px-6 pt-4 pb-24 mt-auto border-t border-mastodon-border/50">
+        <button
+          onClick={toggleLanguage}
+          className="flex items-center justify-center gap-2 w-full py-2.5 mb-2 text-mastodon-text-primary hover:bg-white/5 rounded-lg text-sm transition-colors cursor-pointer"
+        >
+          <Languages className="w-4 h-4" />
+          <span>{i18n.language.startsWith('zh') ? 'English' : '中文'}</span>
+        </button>
+
         {googleAccessToken ? (
           <div className="flex items-center justify-between py-2 text-mastodon-text-secondary text-xs mb-2">
-            <span className="truncate">Logged in as {googleUser?.name || 'User'}</span>
+            <span className="truncate">{t('nav.logged_in_as', { name: googleUser?.name || 'User' })}</span>
             <button
               onClick={handleLogout}
               className="text-red-400 hover:text-red-300 flex items-center gap-1.5 cursor-pointer ml-2"
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span className="text-xs">Logout</span>
+              <span className="text-xs">{t('nav.logout')}</span>
             </button>
           </div>
         ) : (
@@ -273,13 +288,13 @@ function App() {
             className="flex items-center justify-center gap-2 w-full py-2.5 mb-2 text-mastodon-primary hover:text-mastodon-primary/80 hover:bg-white/5 rounded-lg text-sm transition-colors cursor-pointer"
           >
             <LogIn className="w-4 h-4" />
-            <span>Login with Google</span>
+            <span>{t('nav.login')}</span>
           </button>
         )}
 
         <button
            onClick={async () => {
-             if (confirm('Are you sure you want to clear all data? This cannot be undone.')) {
+             if (confirm(t('common.confirm_clear_all'))) {
                await db.clearAll()
                setHasData(false)
                navigate('/')
@@ -289,7 +304,7 @@ function App() {
            className="flex items-center justify-center gap-2 w-full py-2.5 text-mastodon-text-tertiary hover:text-red-400 hover:bg-white/5 rounded-lg text-sm transition-colors cursor-pointer"
         >
           <Trash2 className="w-4 h-4" />
-          <span>Clear Data</span>
+          <span>{t('nav.clear_data')}</span>
         </button>
       </div>
     </div>
@@ -323,7 +338,6 @@ function App() {
 
       <MainLayout
         leftSidebar={leftSidebarContent}
-        onMobileMenuToggle={location.pathname !== '/' ? () => setMobileMenuOpen(true) : undefined}
         rightSidebar={
            ['/stats', '/profile', '/favourites', '/bookmarks', '/accounts'].includes(location.pathname) || location.pathname.startsWith('/account/') ? undefined : (
              selectedPostId ? (
@@ -334,7 +348,7 @@ function App() {
            ) : (
               <div className="flex items-center justify-center h-full text-mastodon-text-secondary">
                  <div className="text-center p-8">
-                    <p className="mb-2">Select a post to view details</p>
+                    <p className="mb-2">{t('common.select_post')}</p>
                  </div>
               </div>
            )
@@ -344,13 +358,13 @@ function App() {
         <Routes>
            <Route path="/" element={<Timeline onPostClick={handlePostClick} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />} />
            <Route path="/post/:id" element={<PostRouteHandler />} />
-           <Route path="/stats" element={<StatsPage />} />
-           <Route path="/accounts" element={<AccountsPage googleUser={googleUser} googleLogin={googleLogin} googleAccessToken={googleAccessToken} />} />
-           <Route path="/account/*" element={<AccountDetailPage />} />
+           <Route path="/stats" element={<StatsPage onMobileMenuToggle={() => setMobileMenuOpen(true)} />} />
+           <Route path="/accounts" element={<AccountsPage googleUser={googleUser} googleLogin={googleLogin} googleAccessToken={googleAccessToken} onMobileMenuToggle={() => setMobileMenuOpen(true)} />} />
+           <Route path="/account/*" element={<AccountDetailPage onMobileMenuToggle={() => setMobileMenuOpen(true)} />} />
            <Route path="/profile" element={<ProfilePage />} />
-           <Route path="/favourites" element={<InteractionsPage type="likes" />} />
-           <Route path="/bookmarks" element={<InteractionsPage type="bookmarks" />} />
-           <Route path="/memories" element={<MemoriesPage onPostClick={handlePostClick} />} />
+           <Route path="/favourites" element={<InteractionsPage type="likes" onMobileMenuToggle={() => setMobileMenuOpen(true)} />} />
+           <Route path="/bookmarks" element={<InteractionsPage type="bookmarks" onMobileMenuToggle={() => setMobileMenuOpen(true)} />} />
+           <Route path="/memories" element={<MemoriesPage onPostClick={handlePostClick} onMobileMenuToggle={() => setMobileMenuOpen(true)} />} />
            <Route path="/debug" element={<DebugDashboard />} />
         </Routes>
       </MainLayout>

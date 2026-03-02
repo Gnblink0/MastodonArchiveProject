@@ -1,19 +1,22 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Calendar, Loader2, ChevronLeft, ChevronRight, X, Undo2 } from 'lucide-react'
+import { Calendar, Loader2, ChevronLeft, ChevronRight, X, Undo2, Menu } from 'lucide-react'
 import { db } from '../lib/db'
 import type { Post } from '../types'
 import { PostCard } from '../components/Timeline/PostCard'
 import { useAccountFilter } from '../contexts/AccountFilterContext'
+import { useTranslation } from 'react-i18next'
 
 // --- 日历辅助逻辑 ---
 
-const MONTHS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+const getMONTHS = (t: any) => [
+  t('months.jan'), t('months.feb'), t('months.mar'), t('months.apr'), t('months.may'), t('months.jun'), 
+  t('months.jul'), t('months.aug'), t('months.sep'), t('months.oct'), t('months.nov'), t('months.dec')
 ];
 
-const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const getWEEKDAYS = (t: any) => [
+  t('weekdays.su'), t('weekdays.mo'), t('weekdays.tu'), t('weekdays.we'), t('weekdays.th'), t('weekdays.fr'), t('weekdays.sa')
+];
 
 const getDaysInMonth = (year: number, month: number) => {
   return new Date(year, month + 1, 0).getDate();
@@ -26,12 +29,17 @@ const getFirstDayOfMonth = (year: number, month: number) => {
 // ★ 新增：定义组件接收的参数类型
 interface MemoriesPageProps {
   onPostClick?: (postId: string) => void
+  onMobileMenuToggle?: () => void
 }
 
 // ★ 修改：接收 onPostClick 参数
-export function MemoriesPage({ onPostClick }: MemoriesPageProps) {
+export function MemoriesPage({ onPostClick, onMobileMenuToggle }: MemoriesPageProps) {
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { selectedAccountId } = useAccountFilter()
+  
+  const MONTHS = getMONTHS(t)
+  const WEEKDAYS = getWEEKDAYS(t)
   
   // ★ 新增：滚动的容器引用
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -56,7 +64,7 @@ export function MemoriesPage({ onPostClick }: MemoriesPageProps) {
     return today.getMonth() === currentMonth && today.getDate() === currentDate;
   }, [currentMonth, currentDate]);
 
-  const dateTitle = targetDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+  const dateTitle = targetDate.toLocaleDateString(i18n.language.startsWith('zh') ? 'zh-CN' : 'en-US', { month: 'long', day: 'numeric' })
 
   // ★ 修复 Bug 1：监听 selectedYear 变化，强制滚动容器回到顶部
   useEffect(() => {
@@ -174,8 +182,8 @@ export function MemoriesPage({ onPostClick }: MemoriesPageProps) {
           <div className="bg-mastodon-surface border border-mastodon-border rounded-2xl w-full max-w-[340px] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-mastodon-border bg-mastodon-bg/50">
               <div>
-                <h3 className="text-white font-bold text-lg">Select Date</h3>
-                <p className="text-xs text-mastodon-text-tertiary">Based on year {currentYear}</p>
+                <h3 className="text-white font-bold text-lg">{t('memories.select_date')}</h3>
+                <p className="text-xs text-mastodon-text-tertiary">{t('memories.based_on_year', { year: currentYear })}</p>
               </div>
               <button onClick={() => setIsPickerOpen(false)} className="p-1 rounded-full hover:bg-white/10 text-mastodon-text-secondary hover:text-white transition-colors">
                 <X className="w-5 h-5" />
@@ -244,17 +252,20 @@ export function MemoriesPage({ onPostClick }: MemoriesPageProps) {
         <header className="px-4 py-3 border-b border-mastodon-border/50">
           <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <button 
-                  onClick={() => navigate(-1)} 
-                  className="md:hidden text-mastodon-text-secondary hover:text-white p-1"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
+                {onMobileMenuToggle && (
+                  <button
+                    onClick={onMobileMenuToggle}
+                    className="md:hidden bg-mastodon-surface p-3 rounded-full text-white cursor-pointer"
+                    aria-label="Toggle Menu"
+                  >
+                    <Menu className="w-6 h-6" />
+                  </button>
+                )}
                 
                 <div className="flex items-center gap-3">
                     <div>
                       <span className="block text-[10px] text-mastodon-text-tertiary font-bold tracking-widest uppercase leading-none mb-0.5">
-                        On This Day
+                        {t('memories.on_this_day')}
                       </span>
                       <h1 className="text-xl font-bold text-white leading-none">
                         {dateTitle}
@@ -265,10 +276,10 @@ export function MemoriesPage({ onPostClick }: MemoriesPageProps) {
                       <button 
                         onClick={jumpToToday}
                         className="flex items-center gap-1.5 px-2.5 py-1.5 bg-mastodon-primary/10 hover:bg-mastodon-primary/20 text-mastodon-primary text-xs font-bold rounded-full transition-colors group ml-1"
-                        title="Back to Today"
+                        title={t('memories.today')}
                       >
                         <Undo2 className="w-3.5 h-3.5 group-hover:-rotate-45 transition-transform duration-300" />
-                        TODAY
+                        {t('memories.today')}
                       </button>
                     )}
                 </div>
@@ -278,7 +289,7 @@ export function MemoriesPage({ onPostClick }: MemoriesPageProps) {
                 <button 
                     onClick={() => setIsPickerOpen(true)}
                     className={`p-2 rounded-lg transition-colors border border-transparent ${isPickerOpen ? 'bg-mastodon-primary text-white' : 'bg-mastodon-surface text-mastodon-text-secondary hover:text-white hover:bg-white/10 hover:border-mastodon-border'}`}
-                    title="Pick a Date"
+                    title={t('memories.pick_date')}
                   >
                     <Calendar className="w-5 h-5" />
                 </button>
@@ -287,7 +298,7 @@ export function MemoriesPage({ onPostClick }: MemoriesPageProps) {
                   <button 
                     onClick={() => shiftDate(-1)}
                     className="p-1.5 text-mastodon-text-secondary hover:text-white hover:bg-white/10 rounded-md transition-colors"
-                    title="Previous Day"
+                    title={t('memories.prev_day')}
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
@@ -295,7 +306,7 @@ export function MemoriesPage({ onPostClick }: MemoriesPageProps) {
                   <button 
                     onClick={() => shiftDate(1)}
                     className="p-1.5 text-mastodon-text-secondary hover:text-white hover:bg-white/10 rounded-md transition-colors"
-                    title="Next Day"
+                    title={t('memories.next_day')}
                   >
                     <ChevronRight className="w-5 h-5" />
                   </button>
@@ -338,9 +349,9 @@ export function MemoriesPage({ onPostClick }: MemoriesPageProps) {
               <Calendar className="w-10 h-10 text-mastodon-text-secondary/50 group-hover:text-mastodon-primary transition-colors" />
             </div>
             
-            <h3 className="text-xl font-bold text-white mb-2">No memories found</h3>
+            <h3 className="text-xl font-bold text-white mb-2">{t('memories.no_memories')}</h3>
             <p className="text-mastodon-text-secondary max-w-sm mb-8 leading-relaxed">
-              Nothing in your archive for <span className="text-mastodon-primary font-medium">{dateTitle}</span>.
+              {t('memories.nothing_for', { date: dateTitle })}
             </p>
             
             <div className="flex gap-3">
@@ -348,13 +359,13 @@ export function MemoriesPage({ onPostClick }: MemoriesPageProps) {
                 onClick={() => shiftDate(-1)}
                 className="px-5 py-2.5 bg-mastodon-surface border border-mastodon-border rounded-full text-sm font-medium text-white hover:border-mastodon-primary transition-all hover:shadow-lg hover:shadow-mastodon-primary/10"
               >
-                Check Yesterday
+                {t('memories.check_yesterday')}
               </button>
               <button 
                 onClick={() => setIsPickerOpen(true)}
                 className="px-5 py-2.5 bg-mastodon-primary text-white rounded-full text-sm font-medium hover:bg-mastodon-primary-hover transition-colors shadow-lg shadow-mastodon-primary/20"
               >
-                Pick a Date
+                {t('memories.pick_date')}
               </button>
             </div>
           </div>
@@ -372,7 +383,7 @@ export function MemoriesPage({ onPostClick }: MemoriesPageProps) {
                
                <div className="text-center py-12">
                   <p className="text-mastodon-text-tertiary text-xs uppercase tracking-widest">
-                    End of {selectedYear}
+                    {t('memories.end_of_year', { year: selectedYear })}
                   </p>
                </div>
             </div>

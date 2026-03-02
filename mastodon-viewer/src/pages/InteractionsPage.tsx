@@ -1,20 +1,23 @@
 import { useState, useRef } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { Star, Bookmark as BookmarkIcon, ArrowUpDown, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Star, Bookmark as BookmarkIcon, ArrowUpDown, Check, ChevronLeft, ChevronRight, Menu } from 'lucide-react'
 import { EmbeddedPost } from '../components/Timeline/EmbeddedPost'
 import { ScrollToTopButton } from '../components/Timeline/ScrollToTopButton'
 import { useAccountFilter } from '../contexts/AccountFilterContext'
+import { useTranslation } from 'react-i18next'
 
 interface InteractionsPageProps {
   type: 'likes' | 'bookmarks'
+  onMobileMenuToggle?: () => void
 }
 
 type SortOption = 'original' | 'reverse'
 
 const PAGE_SIZE = 20
 
-export function InteractionsPage({ type }: InteractionsPageProps) {
+export function InteractionsPage({ type, onMobileMenuToggle }: InteractionsPageProps) {
+  const { t } = useTranslation()
   const parentRef = useRef<HTMLDivElement>(null)
   const [sortOption, setSortOption] = useState<SortOption>('original')
   const [isSortOpen, setIsSortOpen] = useState(false)
@@ -63,8 +66,8 @@ export function InteractionsPage({ type }: InteractionsPageProps) {
   }, [type, currentPage, sortOption, selectedAccountId])
 
   const sortOptions: { value: SortOption; label: string }[] = [
-    { value: 'original', label: 'Original Order' },
-    { value: 'reverse', label: 'Newest (Reverse)' },
+    { value: 'original', label: t('sort_options.original') },
+    { value: 'reverse', label: t('sort_options.reverse') },
   ]
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
@@ -84,7 +87,7 @@ export function InteractionsPage({ type }: InteractionsPageProps) {
   if (!data) {
     return (
        <div className="flex justify-center items-center h-full text-mastodon-text-secondary">
-          <p>Loading...</p>
+          <p>{t('common.loading')}</p>
        </div>
     )
   }
@@ -93,6 +96,15 @@ export function InteractionsPage({ type }: InteractionsPageProps) {
     <div className="h-full flex flex-col max-w-4xl mx-auto">
       <div className="px-4 pt-8 pb-4 flex items-center justify-between">
          <div className="flex items-center gap-3">
+            {onMobileMenuToggle && (
+              <button
+                onClick={onMobileMenuToggle}
+                className="md:hidden bg-mastodon-surface p-3 rounded-full text-white cursor-pointer mr-2"
+                aria-label="Toggle Menu"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+            )}
             <div className="p-3 bg-mastodon-surface rounded-full">
                {type === 'likes' ? (
                    <Star className="w-6 h-6 text-[#e5c500]" />
@@ -102,9 +114,9 @@ export function InteractionsPage({ type }: InteractionsPageProps) {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white capitalize">
-                  {type === 'likes' ? 'Favourites' : 'Bookmarks'}
+                  {type === 'likes' ? t('nav.favourites') : t('nav.bookmarks')}
               </h1>
-              <p className="text-sm text-mastodon-text-secondary">{totalCount} items</p>
+              <p className="text-sm text-mastodon-text-secondary">{totalCount} {t('common.items')}</p>
             </div>
          </div>
 
@@ -114,7 +126,7 @@ export function InteractionsPage({ type }: InteractionsPageProps) {
               className="flex items-center gap-2 px-3 py-2 bg-mastodon-surface hover:bg-mastodon-surface/80 rounded-lg text-sm font-medium text-mastodon-text-primary transition-colors border border-mastodon-border cursor-pointer"
             >
               <ArrowUpDown className="w-4 h-4" />
-              <span>Sort</span>
+              <span>{t('common.sort')}</span>
             </button>
 
             {isSortOpen && (
@@ -150,7 +162,7 @@ export function InteractionsPage({ type }: InteractionsPageProps) {
       >
         {data.length === 0 ? (
           <div className="bg-mastodon-surface rounded-xl border border-mastodon-border p-8 text-center text-mastodon-text-secondary">
-             No items found.
+             {t('common.no_items')}
           </div>
         ) : (
           <div className="space-y-6">
@@ -176,7 +188,7 @@ export function InteractionsPage({ type }: InteractionsPageProps) {
               <ChevronLeft className="w-5 h-5" />
             </button>
             <span className="text-mastodon-text-secondary text-sm">
-              Page {currentPage} of {totalPages}
+              {t('common.page_x_of_y', { current: currentPage, total: totalPages })}
             </span>
             <button
               onClick={() => handlePageChange(currentPage + 1)}

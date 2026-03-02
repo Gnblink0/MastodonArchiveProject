@@ -1,11 +1,17 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAccount } from '../hooks/usePosts'
-import { Calendar, MessageSquare, ArrowLeft, Star, Bookmark, History, FileArchive, Database } from 'lucide-react'
+import { Calendar, MessageSquare, ArrowLeft, Star, Bookmark, History, FileArchive, Database, Menu } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { db } from '../lib/db'
+import { useTranslation } from 'react-i18next'
 import type { ImportRecord } from '../types'
 
-export function AccountDetailPage() {
+interface AccountDetailPageProps {
+  onMobileMenuToggle?: () => void
+}
+
+export function AccountDetailPage({ onMobileMenuToggle }: AccountDetailPageProps) {
+  const { t, i18n } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -38,7 +44,7 @@ export function AccountDetailPage() {
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-mastodon-primary mb-4"></div>
-          <p className="text-mastodon-text-secondary">Loading account...</p>
+          <p className="text-mastodon-text-secondary">{t('common.loading_account')}</p>
         </div>
       </div>
     )
@@ -49,13 +55,13 @@ export function AccountDetailPage() {
     return (
       <div className="flex items-center justify-center h-full text-mastodon-text-secondary">
         <div className="text-center">
-          <p className="text-lg mb-4">Account not found</p>
+          <p className="text-lg mb-4">{t('common.account_not_found')}</p>
           <p className="text-sm mb-4">ID: {accountId}</p>
           <button
             onClick={() => navigate('/accounts')}
             className="text-mastodon-primary hover:underline"
           >
-            Back to Accounts
+            {t('common.back_to_accounts')}
           </button>
         </div>
       </div>
@@ -76,7 +82,7 @@ export function AccountDetailPage() {
   const fullHandle = instanceDomain ? `@${account.preferredUsername}@${instanceDomain}` : `@${account.preferredUsername}`
 
   // Format date
-  const joinDate = new Intl.DateTimeFormat('en-US', {
+  const joinDate = new Intl.DateTimeFormat(i18n.language.startsWith('zh') ? 'zh-CN' : 'en-US', {
     month: 'long',
     day: 'numeric',
     year: 'numeric'
@@ -95,13 +101,22 @@ export function AccountDetailPage() {
     <div className="h-full overflow-auto">
       <div className="max-w-7xl mx-auto pb-10">
         {/* Back Button */}
-        <div className="px-6 pt-4 pb-2">
+        <div className="px-6 pt-4 pb-2 flex items-center gap-4">
+          {onMobileMenuToggle && (
+            <button
+              onClick={onMobileMenuToggle}
+              className="md:hidden bg-mastodon-surface p-3 rounded-full text-white cursor-pointer"
+              aria-label="Toggle Menu"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+          )}
           <button
             onClick={() => navigate('/accounts')}
             className="flex items-center gap-2 text-mastodon-text-secondary hover:text-mastodon-primary transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span>Back to Accounts</span>
+            <span>{t('common.back_to_accounts')}</span>
           </button>
         </div>
 
@@ -142,7 +157,7 @@ export function AccountDetailPage() {
                 <p className="text-mastodon-text-secondary text-lg">{fullHandle}</p>
                 <div className="flex items-center gap-1.5 text-mastodon-text-secondary text-sm bg-white/5 px-2 py-0.5 rounded-full">
                   <Calendar className="w-3.5 h-3.5" />
-                  <span>Joined {joinDate}</span>
+                  <span>{t('common.joined', { date: joinDate })}</span>
                 </div>
               </div>
             </div>
@@ -172,7 +187,7 @@ export function AccountDetailPage() {
                   <MessageSquare className="w-5 h-5 text-mastodon-text-secondary" />
                   <span className="font-bold text-white text-2xl">{account.postsCount.toLocaleString()}</span>
                 </div>
-                <span className="text-mastodon-text-secondary text-sm uppercase tracking-wider font-medium">Posts</span>
+                <span className="text-mastodon-text-secondary text-sm uppercase tracking-wider font-medium">{t('common.posts')}</span>
               </div>
               
               <div className="flex flex-col items-center border-l border-mastodon-border">
@@ -180,7 +195,7 @@ export function AccountDetailPage() {
                   <Star className="w-5 h-5 text-[#e5c500]" />
                   <span className="font-bold text-white text-2xl">{account.likesCount.toLocaleString()}</span>
                 </div>
-                <span className="text-mastodon-text-secondary text-sm uppercase tracking-wider font-medium">Likes</span>
+                <span className="text-mastodon-text-secondary text-sm uppercase tracking-wider font-medium">{t('common.likes')}</span>
               </div>
               
               <div className="flex flex-col items-center border-l border-mastodon-border">
@@ -188,7 +203,7 @@ export function AccountDetailPage() {
                   <Bookmark className="w-5 h-5 text-[#2b90d9]" />
                   <span className="font-bold text-white text-2xl">{account.bookmarksCount.toLocaleString()}</span>
                 </div>
-                <span className="text-mastodon-text-secondary text-sm uppercase tracking-wider font-medium">Saved</span>
+                <span className="text-mastodon-text-secondary text-sm uppercase tracking-wider font-medium">{t('common.saved')}</span>
               </div>
             </div>
           </div>
@@ -198,13 +213,13 @@ export function AccountDetailPage() {
         <div className="px-6 mt-8">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <History className="w-6 h-6" />
-            Archive History
+            {t('common.archive_history')}
           </h2>
 
           <div className="bg-mastodon-surface rounded-lg overflow-hidden border border-mastodon-border">
             {isLoadingHistory ? (
               <div className="p-8 text-center text-mastodon-text-secondary">
-                Loading history...
+                {t('common.loading_history')}
               </div>
             ) : history.length > 0 ? (
               <div className="divide-y divide-mastodon-border">
@@ -218,14 +233,14 @@ export function AccountDetailPage() {
                         <div>
                           <h3 className="text-lg font-bold text-white">{record.fileName}</h3>
                           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-mastodon-text-secondary">
-                            <span>{new Date(record.importedAt).toLocaleString()}</span>
+                            <span>{new Date(record.importedAt).toLocaleString(i18n.language.startsWith('zh') ? 'zh-CN' : 'en-US')}</span>
                             <span>•</span>
                             <span>{formatFileSize(record.fileSize)}</span>
                             <span>•</span>
                             <span className={`uppercase text-xs font-bold px-2 py-0.5 rounded ${
                               record.importStrategy === 'replace' ? 'bg-red-500/20 text-red-300' : 'bg-blue-500/20 text-blue-300'
                             }`}>
-                              {record.importStrategy || 'Replace'}
+                              {record.importStrategy === 'replace' ? t('common.replace') : (record.importStrategy === 'merge' ? t('common.merge') : record.importStrategy || t('common.replace'))}
                             </span>
                           </div>
                         </div>
@@ -234,19 +249,19 @@ export function AccountDetailPage() {
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 bg-mastodon-bg/50 p-4 rounded-lg">
                       <div className="flex flex-col">
-                        <span className="text-mastodon-text-secondary text-xs uppercase font-bold">Posts</span>
+                        <span className="text-mastodon-text-secondary text-xs uppercase font-bold">{t('common.posts')}</span>
                         <span className="text-white text-lg font-mono">{record.stats.posts.toLocaleString()}</span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-mastodon-text-secondary text-xs uppercase font-bold">Media</span>
+                        <span className="text-mastodon-text-secondary text-xs uppercase font-bold">{t('common.media')}</span>
                         <span className="text-white text-lg font-mono">{record.stats.media.toLocaleString()}</span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-mastodon-text-secondary text-xs uppercase font-bold">Likes</span>
+                        <span className="text-mastodon-text-secondary text-xs uppercase font-bold">{t('common.likes')}</span>
                         <span className="text-white text-lg font-mono">{record.stats.likes.toLocaleString()}</span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-mastodon-text-secondary text-xs uppercase font-bold">Bookmarks</span>
+                        <span className="text-mastodon-text-secondary text-xs uppercase font-bold">{t('common.saved')}</span>
                         <span className="text-white text-lg font-mono">{record.stats.bookmarks.toLocaleString()}</span>
                       </div>
                     </div>
@@ -258,9 +273,9 @@ export function AccountDetailPage() {
                 <div className="inline-block p-4 bg-mastodon-bg rounded-full mb-4 text-mastodon-text-secondary">
                   <Database className="w-8 h-8" />
                 </div>
-                <h3 className="text-lg font-medium text-white mb-2">No Import History</h3>
+                <h3 className="text-lg font-medium text-white mb-2">{t('common.no_import_history')}</h3>
                 <p className="text-mastodon-text-secondary">
-                  Import records will appear here after you upload an archive.
+                  {t('common.import_history_desc')}
                 </p>
               </div>
             )}

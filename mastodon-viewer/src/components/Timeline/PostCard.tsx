@@ -8,6 +8,7 @@ import Lightbox from 'yet-another-react-lightbox'
 import Zoom from 'yet-another-react-lightbox/plugins/zoom'
 import 'yet-another-react-lightbox/styles.css'
 import { EmbeddedPost } from './EmbeddedPost'
+import { useTranslation } from 'react-i18next'
 
 interface PostCardProps {
   post: Post
@@ -18,6 +19,7 @@ interface PostCardProps {
 }
 
 export function PostCard({ post, onClick, highlight, showBorder = true, className = '' }: PostCardProps) {
+  const { t, i18n } = useTranslation()
   // 侦探代码：看看控制台里有没有打印出 emojis 数组
   console.log('当前帖子数据:', post.id, (post as any).emojis);
   // Logic to fetch boosted post if it's a boost
@@ -39,7 +41,7 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
   const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('zh-CN', {
+    return new Intl.DateTimeFormat(i18n.language.startsWith('zh') ? 'zh-CN' : 'en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -142,7 +144,7 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
       {post.type === 'boost' && (
         <div className="mb-2 text-sm text-mastodon-text-secondary flex items-center gap-2 pl-12">
           <span>🔄</span>
-          <span>Boosted</span>
+          <span>{t('post.boosted')}</span>
         </div>
       )}
 
@@ -188,7 +190,7 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
                 }}
                 className="text-xs text-mastodon-text-link uppercase font-bold hover:underline cursor-pointer"
               >
-                {isExpanded ? 'Show less' : 'Show more'}
+                {isExpanded ? t('post.show_less') : t('post.show_more')}
               </button>
             </div>
           )}
@@ -255,14 +257,14 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
                 {displayPost.inReplyTo && (
                    <div className="flex items-center gap-1.5">
                       <Reply className="w-3.5 h-3.5" />
-                      <span>In reply to a post</span>
+                      <span>{t('post.in_reply_to')}</span>
                    </div>
                 )}
                 
                 {post.type === 'boost' && !boostedPost && (
                    <div className="flex items-center gap-1.5 text-mastodon-text-secondary italic">
                       <ExternalLink className="w-3.5 h-3.5" />
-                      <span>External Boost</span>
+                      <span>{t('post.external_boost')}</span>
                    </div>
                 )}
              </div>
@@ -273,10 +275,10 @@ export function PostCard({ post, onClick, highlight, showBorder = true, classNam
                rel="noopener noreferrer"
                onClick={(e) => e.stopPropagation()}
                className="flex items-center gap-1.5 hover:text-mastodon-primary transition-colors"
-               title="View Original on Server"
+               title={t('post.view_original')}
              >
                <ExternalLink className="w-3.5 h-3.5" />
-               <span>View Original</span>
+               <span>{t('post.view_original')}</span>
              </a>
           </div>
         </div>

@@ -1,0 +1,118 @@
+{
+  "nav": {
+    "home": "主页",
+    "stats": "统计数据",
+    "accounts": "账户",
+    "favourites": "收藏",
+    "bookmarks": "书签",
+    "memories": "往年今日",
+    "login": "使用 Google 登录",
+    "logout": "注销",
+    "clear_data": "清除所有数据",
+    "logged_in_as": "已登录为 {{name}}"
+  },
+  "common": {
+    "archive_viewer": "存档查看器",
+    "loading": "加载中...",
+    "confirm_clear_all": "您确定要清除所有数据吗？此操作无法撤销。",
+    "select_post": "选择一条帖子以查看详细信息",
+    "upload_history": "上传您的存档以浏览历史记录",
+    "search_placeholder": "搜索帖子...",
+    "items": "项",
+    "sort": "排序",
+    "page_x_of_y": "第 {{current}} 页，共 {{total}} 页",
+    "no_items": "未找到相关内容。",
+    "back": "返回",
+    "loading_account": "加载账户中...",
+    "account_not_found": "找不到该账户",
+    "back_to_accounts": "返回账户列表",
+    "joined": "加入时间 {{date}}",
+    "posts": "帖子",
+    "likes": "收藏",
+    "saved": "书签",
+    "media": "媒体",
+    "archive_history": "导入历史",
+    "no_import_history": "无导入历史",
+    "import_history_desc": "上传存档后，导入记录将显示在这里。",
+    "loading_history": "加载历史记录中...",
+    "replace": "替换",
+    "merge": "合并"
+  },
+  "timeline": {
+    "loaded_x_of_y": "已加载 {{count}} / {{total}} 条帖子",
+    "viewing_month": "正在查看所选月份的 {{count}} 条帖子",
+    "return_to_timeline": "返回完整时间轴",
+    "load_earlier": "加载更早的帖子",
+    "try_different_keywords": "尝试其他关键词",
+    "no_posts_in_archive": "存档中没有帖子",
+    "end_of_timeline": "您已到达时间轴的尽头",
+    "searching": "搜索中...",
+    "found_results": "找到 {{count}} 个结果"
+  },
+  "stats": {
+    "overview": "统计概览",
+    "archive": "存档",
+    "from_to": "从 {{start}} 到 {{end}} ({{days}} 天)",
+    "replies": "回复",
+    "boosts": "转推",
+    "favourites": "收藏",
+    "bookmarks": "书签",
+    "all_time": "总计",
+    "heatmap": "活动热力图",
+    "less": "少",
+    "more": "多",
+    "distribution": "推文分布",
+    "visibility": "可见性",
+    "original": "原创",
+    "reply": "回复",
+    "total": "总计",
+    "interacted_users": "互动最多的用户",
+    "trend": "活动趋势",
+    "line": "折线图",
+    "bar": "柱状图",
+    "public": "公开",
+    "unlisted": "未列出",
+    "private": "仅关注者",
+    "direct": "私信"
+  },
+  "accounts": {
+    "manage_x_accounts": "管理您的 {{count}} 个 Mastodon 账户",
+    "manage_x_accounts_plural": "管理您的 {{count}} 个 Mastodon 账户",
+    "global_filter": "全局过滤（影响时间轴、收藏、书签、统计）",
+    "all_accounts": "所有账户",
+    "import_another": "导入另一个存档",
+    "no_accounts": "未找到账户"
+  },
+  "memories": {
+    "on_this_day": "那年今日",
+    "today": "今天",
+    "select_date": "选择日期",
+    "based_on_year": "基于 {{year}} 年",
+    "prev_day": "前一天",
+    "next_day": "后一天",
+    "pick_date": "选择日期",
+    "no_memories": "未找到回忆",
+    "nothing_for": "您的存档中没有 {{date}} 的内容。",
+    "check_yesterday": "查看昨天",
+    "end_of_year": "{{year}} 年结束"
+  },
+  "post": {
+    "boosted": "已转推",
+    "show_more": "显示更多",
+    "show_less": "显示更少",
+    "in_reply_to": "回复了一条帖子",
+    "external_boost": "外部转推",
+    "view_original": "查看原文"
+  },
+  "sort_options": {
+    "original": "原始顺序",
+    "reverse": "最新在前"
+  },
+  "months": {
+    "jan": "一月", "feb": "二月", "mar": "三月", "apr": "四月", "may": "五月", "jun": "六月",
+    "jul": "七月", "aug": "八月", "sep": "九月", "oct": "十月", "nov": "十一月", "dec": "十二月"
+  },
+  "weekdays": {
+    "su": "日", "mo": "一", "tu": "二", "we": "三", "th": "四", "fr": "五", "sa": "六"
+  }
+}

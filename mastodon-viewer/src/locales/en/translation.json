@@ -1,0 +1,118 @@
+{
+  "nav": {
+    "home": "Home",
+    "stats": "Statistics",
+    "accounts": "Accounts",
+    "favourites": "Favourites",
+    "bookmarks": "Bookmarks",
+    "memories": "Memories",
+    "login": "Login with Google",
+    "logout": "Logout",
+    "clear_data": "Clear Data",
+    "logged_in_as": "Logged in as {{name}}"
+  },
+  "common": {
+    "archive_viewer": "Archive Viewer",
+    "loading": "Loading...",
+    "confirm_clear_all": "Are you sure you want to clear all data? This cannot be undone.",
+    "select_post": "Select a post to view details",
+    "upload_history": "Upload your archive to browse your history",
+    "search_placeholder": "Search posts...",
+    "items": "items",
+    "sort": "Sort",
+    "page_x_of_y": "Page {{current}} of {{total}}",
+    "no_items": "No items found.",
+    "back": "Back",
+    "loading_account": "Loading account...",
+    "account_not_found": "Account not found",
+    "back_to_accounts": "Back to Accounts",
+    "joined": "Joined {{date}}",
+    "posts": "Posts",
+    "likes": "Likes",
+    "saved": "Saved",
+    "media": "Media",
+    "archive_history": "Archive History",
+    "no_import_history": "No Import History",
+    "import_history_desc": "Import records will appear here after you upload an archive.",
+    "loading_history": "Loading history...",
+    "replace": "Replace",
+    "merge": "Merge"
+  },
+  "timeline": {
+    "loaded_x_of_y": "Loaded {{count}} of {{total}} posts",
+    "viewing_month": "Viewing {{count}} posts from selected month",
+    "return_to_timeline": "Return to timeline",
+    "load_earlier": "Load earlier posts",
+    "try_different_keywords": "Try different keywords",
+    "no_posts_in_archive": "No posts in archive",
+    "end_of_timeline": "You've reached the end of your timeline",
+    "searching": "Searching...",
+    "found_results": "Found {{count}} results"
+  },
+  "stats": {
+    "overview": "Statistics Overview",
+    "archive": "Archive",
+    "from_to": "From {{start}} To {{end}} ({{days}} days)",
+    "replies": "Replies",
+    "boosts": "Boosts",
+    "favourites": "Favourites",
+    "bookmarks": "Bookmarks",
+    "all_time": "All time",
+    "heatmap": "Activity Heatmap",
+    "less": "Less",
+    "more": "More",
+    "distribution": "Toots Distribution",
+    "visibility": "Visibility",
+    "original": "Original",
+    "reply": "Reply",
+    "total": "Total",
+    "interacted_users": "Most Interacted Users",
+    "trend": "Activity Trend",
+    "line": "Line",
+    "bar": "Bar",
+    "public": "Public",
+    "unlisted": "Unlisted",
+    "private": "Followers-only",
+    "direct": "Direct"
+  },
+  "accounts": {
+    "manage_x_accounts": "Manage your {{count}} Mastodon account",
+    "manage_x_accounts_plural": "Manage your {{count}} Mastodon accounts",
+    "global_filter": "Global Filter (affects Timeline, Favourites, Bookmarks, Statistics)",
+    "all_accounts": "All Accounts",
+    "import_another": "Import Another Archive",
+    "no_accounts": "No accounts found"
+  },
+  "memories": {
+    "on_this_day": "On This Day",
+    "today": "TODAY",
+    "select_date": "Select Date",
+    "based_on_year": "Based on year {{year}}",
+    "prev_day": "Previous Day",
+    "next_day": "Next Day",
+    "pick_date": "Pick a Date",
+    "no_memories": "No memories found",
+    "nothing_for": "Nothing in your archive for {{date}}.",
+    "check_yesterday": "Check Yesterday",
+    "end_of_year": "End of {{year}}"
+  },
+  "post": {
+    "boosted": "Boosted",
+    "show_more": "Show more",
+    "show_less": "Show less",
+    "in_reply_to": "In reply to a post",
+    "external_boost": "External Boost",
+    "view_original": "View Original"
+  },
+  "sort_options": {
+    "original": "Original Order",
+    "reverse": "Newest (Reverse)"
+  },
+  "months": {
+    "jan": "Jan", "feb": "Feb", "mar": "Mar", "apr": "Apr", "may": "May", "jun": "Jun",
+    "jul": "Jul", "aug": "Aug", "sep": "Sep", "oct": "Oct", "nov": "Nov", "dec": "Dec"
+  },
+  "weekdays": {
+    "su": "Su", "mo": "Mo", "tu": "Tu", "we": "We", "th": "Th", "fr": "Fr", "sa": "Sa"
+  }
+}

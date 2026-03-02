@@ -2,17 +2,20 @@ import { useState } from 'react'
 import { useAccounts } from '../hooks/usePosts'
 import { AccountCard } from '../components/Accounts/AccountCard'
 import { UploadModal } from '../components/Upload/UploadModal'
-import { Users, Upload } from 'lucide-react'
+import { Users, Upload, Menu } from 'lucide-react'
 import { useAccountFilter } from '../contexts/AccountFilterContext'
+import { useTranslation } from 'react-i18next'
 import type { Account } from '../types'
 
 interface AccountsPageProps {
   googleUser?: any
   googleLogin?: () => void
   googleAccessToken?: string | null
+  onMobileMenuToggle?: () => void
 }
 
-export function AccountsPage({ googleUser, googleLogin, googleAccessToken }: AccountsPageProps) {
+export function AccountsPage({ googleUser, googleLogin, googleAccessToken, onMobileMenuToggle }: AccountsPageProps) {
+  const { t } = useTranslation()
   const accounts = useAccounts()
   const [showUploadModal, setShowUploadModal] = useState(false)
   const { selectedAccountId, setSelectedAccountId } = useAccountFilter()
@@ -48,7 +51,7 @@ export function AccountsPage({ googleUser, googleLogin, googleAccessToken }: Acc
   if (!accounts || accounts.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-mastodon-text-secondary">
-        <p>No accounts found</p>
+        <p>{t('accounts.no_accounts')}</p>
       </div>
     )
   }
@@ -57,21 +60,34 @@ export function AccountsPage({ googleUser, googleLogin, googleAccessToken }: Acc
     <div className="h-full overflow-auto">
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Users className="w-8 h-8 text-mastodon-primary" />
-            <h1 className="text-3xl font-bold text-white">Accounts</h1>
+        <div className="mb-8 flex items-start gap-4">
+          {onMobileMenuToggle && (
+            <button
+              onClick={onMobileMenuToggle}
+              className="md:hidden bg-mastodon-surface p-3 rounded-full text-white cursor-pointer"
+              aria-label="Toggle Menu"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+          )}
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <Users className="w-8 h-8 text-mastodon-primary" />
+              <h1 className="text-3xl font-bold text-white">{t('nav.accounts')}</h1>
+            </div>
+            <p className="text-mastodon-text-secondary">
+              {accounts.length > 1 
+                ? t('accounts.manage_x_accounts_plural', { count: accounts.length })
+                : t('accounts.manage_x_accounts', { count: accounts.length })}
+            </p>
           </div>
-          <p className="text-mastodon-text-secondary">
-            Manage your {accounts.length} Mastodon account{accounts.length > 1 ? 's' : ''}
-          </p>
         </div>
 
         {/* Global Account Filter */}
         {accounts && accounts.length > 1 && (
           <div className="mb-6 p-4 bg-mastodon-surface rounded-xl border border-mastodon-border">
             <h3 className="text-sm font-medium text-mastodon-text-secondary mb-3">
-              Global Filter (affects Timeline, Favourites, Bookmarks, Statistics)
+              {t('accounts.global_filter')}
             </h3>
             <div className="flex gap-2 flex-wrap">
               <button
@@ -83,7 +99,7 @@ export function AccountsPage({ googleUser, googleLogin, googleAccessToken }: Acc
                 }`}
               >
                 <Users className="w-4 h-4" />
-                All Accounts
+                {t('accounts.all_accounts')}
               </button>
               {accounts.map(account => (
                 <button
@@ -122,7 +138,7 @@ export function AccountsPage({ googleUser, googleLogin, googleAccessToken }: Acc
           >
             <Upload className="w-8 h-8 text-mastodon-text-secondary group-hover:text-mastodon-primary transition-colors mr-3" />
             <p className="text-mastodon-text-secondary group-hover:text-mastodon-primary transition-colors text-lg">
-              Import Another Archive
+              {t('accounts.import_another')}
             </p>
           </div>
         </div>

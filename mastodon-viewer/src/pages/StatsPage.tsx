@@ -14,11 +14,17 @@ import {
   CartesianGrid,
   Brush
 } from 'recharts'
-import { BarChart3, TrendingUp, Calendar } from 'lucide-react'
+import { BarChart3, TrendingUp, Calendar, Menu } from 'lucide-react'
 import { format, startOfYear, endOfYear, getYear, eachWeekOfInterval } from 'date-fns'
 import { useAccountFilter } from '../contexts/AccountFilterContext'
+import { useTranslation } from 'react-i18next'
 
-export function StatsPage() {
+interface StatsPageProps {
+  onMobileMenuToggle?: () => void
+}
+
+export function StatsPage({ onMobileMenuToggle }: StatsPageProps) {
+  const { t } = useTranslation()
   const [chartType, setChartType] = useState<'line' | 'bar'>('line')
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
   const [tooltipVisible, setTooltipVisible] = useState(false)
@@ -251,7 +257,7 @@ export function StatsPage() {
   if (!stats) {
     return (
        <div className="flex items-center justify-center min-h-screen text-mastodon-text-secondary">
-         <p>Loading statistics...</p>
+         <p>{t('common.loading')}</p>
        </div>
     )
   }
@@ -285,14 +291,23 @@ export function StatsPage() {
     <div className="h-full overflow-auto bg-[#191b22] text-[#d9e1e8] p-4 md:p-8 font-sans">
       
       {/* Header & Meta */}
-      <div className="bg-[#282c37] rounded-lg p-6 mb-8 text-center shadow-lg border border-[#393f4f]">
+      <div className="bg-[#282c37] rounded-lg p-6 mb-8 text-center shadow-lg border border-[#393f4f] relative">
+         {onMobileMenuToggle && (
+           <button
+             onClick={onMobileMenuToggle}
+             className="md:hidden absolute top-4 left-4 bg-mastodon-surface p-3 rounded-full text-white cursor-pointer"
+             aria-label="Toggle Menu"
+           >
+             <Menu className="w-6 h-6" />
+           </button>
+         )}
          <h1 className="text-xl md:text-2xl text-white font-medium mb-4">
-            Statistics Overview
+            {t('stats.overview')}
          </h1>
          <div className="inline-flex flex-wrap justify-center gap-4 text-sm">
-            <span className="bg-[#313543] px-3 py-1 rounded text-[#9baec8]">Archive: {metadata?.originalFilename || 'Unknown'}</span>
+            <span className="bg-[#313543] px-3 py-1 rounded text-[#9baec8]">{t('stats.archive')}: {metadata?.originalFilename || 'Unknown'}</span>
             <span className="bg-[#313543] px-3 py-1 rounded text-[#9baec8]">
-               From {formatDate(dateRange.min)} To {formatDate(dateRange.max)} ({totalDays} days)
+               {t('stats.from_to', { start: formatDate(dateRange.min), end: formatDate(dateRange.max), days: totalDays })}
             </span>
          </div>
       </div>
@@ -300,15 +315,15 @@ export function StatsPage() {
       {/* Summary Cards Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'Replies', count: totalReplies, color: 'text-[#8c8dff]', bg: 'bg-[#8c8dff]/10' },
-          { label: 'Boosts', count: totalBoosts, color: 'text-[#ff5050]', bg: 'bg-[#ff5050]/10' },
-          { label: 'Favourites', count: totalFavourites, color: 'text-[#e5c500]', bg: 'bg-[#e5c500]/10' },
-          { label: 'Bookmarks', count: totalBookmarks, color: 'text-[#2b90d9]', bg: 'bg-[#2b90d9]/10' }
+          { label: t('stats.replies'), count: totalReplies, color: 'text-[#8c8dff]', bg: 'bg-[#8c8dff]/10' },
+          { label: t('stats.boosts'), count: totalBoosts, color: 'text-[#ff5050]', bg: 'bg-[#ff5050]/10' },
+          { label: t('stats.favourites'), count: totalFavourites, color: 'text-[#e5c500]', bg: 'bg-[#e5c500]/10' },
+          { label: t('stats.bookmarks'), count: totalBookmarks, color: 'text-[#2b90d9]', bg: 'bg-[#2b90d9]/10' }
         ].map(card => (
           <div key={card.label} className={`rounded-lg p-6 border border-[#393f4f] bg-[#282c37] flex flex-col items-center justify-center transition-transform hover:scale-105`}>
              <h3 className="text-[#9baec8] text-xs md:text-sm uppercase tracking-wider mb-2">{card.label}</h3>
              <div className={`text-2xl md:text-4xl font-bold ${card.color} mb-1`}>{card.count.toLocaleString()}</div>
-             <div className="text-xs text-[#606984]">All time</div>
+             <div className="text-xs text-[#606984]">{t('stats.all_time')}</div>
           </div>
         ))}
       </div>
@@ -318,7 +333,7 @@ export function StatsPage() {
          <div className="flex items-center justify-between mb-6 min-w-[600px]">
             <h2 className="text-lg md:text-xl text-white font-medium flex items-center gap-2">
                <Calendar className="w-5 h-5 text-[#00d97e]" />
-               <span>Activity Heatmap</span>
+               <span>{t('stats.heatmap')}</span>
             </h2>
             {stats.years.length > 0 && (
                <select 
@@ -394,13 +409,13 @@ export function StatsPage() {
          </div>
          
          <div className="flex items-center gap-2 mt-4 text-xs text-[#9baec8] justify-end min-w-[600px]">
-             <span>Less</span>
+             <span>{t('stats.less')}</span>
              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(57, 63, 79, 0.3)' }} />
              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#0e4429' }} />
              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#006d32' }} />
              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#26a641' }} />
              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#39d353}' }} />
-             <span>More</span>
+             <span>{t('stats.more')}</span>
          </div>
       </div>
 
@@ -416,32 +431,32 @@ export function StatsPage() {
           }}
         >
           <p className="font-bold text-white mb-1">{tooltipContent.date}</p>
-          <p className="text-[#9baec8]">Total: <span className="text-white">{tooltipContent.total}</span></p>
-          <p className="text-[#e5c500]">Original: <span className="text-white">{tooltipContent.original}</span></p>
-          <p className="text-[#8c8dff]">Replies: <span className="text-white">{tooltipContent.reply}</span></p>
-          <p className="text-[#ff5050]">Boosts: <span className="text-white">{tooltipContent.boost}</span></p>
+          <p className="text-[#9baec8]">{t('stats.total')}: <span className="text-white">{tooltipContent.total}</span></p>
+          <p className="text-[#e5c500]">{t('stats.original')}: <span className="text-white">{tooltipContent.original}</span></p>
+          <p className="text-[#8c8dff]">{t('stats.reply')}: <span className="text-white">{tooltipContent.reply}</span></p>
+          <p className="text-[#ff5050]">{t('stats.boosts')}: <span className="text-white">{tooltipContent.boost}</span></p>
         </div>
       )}
 
       {/* Toots Overview Table (Main Content) */}
       <div className="mb-8 bg-[#282c37] rounded-lg overflow-hidden border border-[#393f4f]">
             <div className="p-4 bg-[#1f232b] border-b border-[#393f4f] font-bold text-white">
-              Toots Distribution
+              {t('stats.distribution')}
             </div>
             <table className="w-full text-left text-sm">
                 <thead>
                     <tr className="bg-[#1f232b] text-[#8c8dff] font-bold border-b border-[#393f4f]">
-                        <th className="p-3">Visibility</th>
-                        <th className="p-3 text-center">Original</th>
-                        <th className="p-3 text-center">Reply</th>
-                        <th className="p-3 text-center">Total</th>
+                        <th className="p-3">{t('stats.visibility')}</th>
+                        <th className="p-3 text-center">{t('stats.original')}</th>
+                        <th className="p-3 text-center">{t('stats.reply')}</th>
+                        <th className="p-3 text-center">{t('stats.total')}</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-[#393f4f]">
                     {['public', 'unlisted', 'private', 'direct'].map((vis) => (
                         <tr key={vis} className="hover:bg-[#313543] transition-colors">
                             <td className="p-3 font-medium capitalize text-white">
-                                {vis === 'private' ? 'Followers-only' : vis}
+                                {t(`stats.${vis}`)}
                             </td>
                             <td className="p-3 text-center text-[#e5c500] font-bold">{overview[vis as keyof typeof overview].original}</td>
                             <td className="p-3 text-center text-[#8c8dff]">{overview[vis as keyof typeof overview].reply}</td>
@@ -449,7 +464,7 @@ export function StatsPage() {
                         </tr>
                     ))}
                     <tr className="bg-[#313543] font-bold">
-                        <td className="p-3 text-white">Total</td>
+                        <td className="p-3 text-white">{t('stats.total')}</td>
                         <td className="p-3 text-center text-[#e5c500]">{overview.total.original}</td>
                         <td className="p-3 text-center text-[#8c8dff]">{overview.total.reply}</td>
                         <td className="p-3 text-center text-[#00d97e]">{overview.total.total}</td>
@@ -461,16 +476,16 @@ export function StatsPage() {
       {/* Interactions Section */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-             <h2 className="text-lg md:text-xl text-white font-medium">Most Interacted Users</h2>
+             <h2 className="text-lg md:text-xl text-white font-medium">{t('stats.interacted_users')}</h2>
         </div>
 
            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-1 bg-[#282c37] border border-[#393f4f] rounded-lg overflow-hidden">
               {/* Interaction List Helper */}
               {([
-                { title: 'Reply', data: interactions.reply, color: 'text-white' },
-                { title: 'Boost', data: interactions.boost, color: 'text-[#ff5050]' },
-                { title: 'Favourite', data: interactions.like, color: 'text-[#e5c500]' },
-                { title: 'Bookmark', data: interactions.bookmark, color: 'text-[#2b90d9]' }
+                { title: t('stats.reply'), data: interactions.reply, color: 'text-white' },
+                { title: t('stats.boosts'), data: interactions.boost, color: 'text-[#ff5050]' },
+                { title: t('stats.favourites'), data: interactions.like, color: 'text-[#e5c500]' },
+                { title: t('stats.bookmarks'), data: interactions.bookmark, color: 'text-[#2b90d9]' }
               ]).map((section, idx) => (
                   <div key={section.title} className={`p-0 ${idx !== 3 ? 'md:border-r border-[#393f4f]' : ''}`}>
                       <div className="bg-[#1f232b] p-3 text-center font-bold text-[#9baec8] border-b border-[#393f4f]">
@@ -478,7 +493,7 @@ export function StatsPage() {
                       </div>
                       <div className="h-[300px] overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-[#393f4f] scrollbar-track-transparent">
                           {section.data.length === 0 ? (
-                             <div className="text-center text-sm text-gray-500 mt-10">No data available</div>
+                             <div className="text-center text-sm text-gray-500 mt-10">{t('common.no_items')}</div>
                           ) : (
                              <ul className="space-y-1">
                                 {section.data.map(item => (
@@ -507,25 +522,25 @@ export function StatsPage() {
       <div className="bg-[#282c37] p-6 rounded-lg border border-[#393f4f] flex flex-col mb-8">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                Activity Trend
+                {t('stats.trend')}
               </h3>
               
               <div className="flex bg-[#1f232b] p-1 rounded-lg border border-[#393f4f]">
                  <button 
                     onClick={() => setChartType('line')}
                     className={`p-2 rounded flex items-center gap-2 text-sm font-medium transition-colors ${chartType === 'line' ? 'bg-[#2b90d9] text-white' : 'text-[#9baec8] hover:text-white'}`}
-                    title="Line Chart"
+                    title={t('stats.line')}
                  >
                     <TrendingUp className="w-4 h-4" />
-                    <span className="hidden sm:inline">Line</span>
+                    <span className="hidden sm:inline">{t('stats.line')}</span>
                  </button>
                  <button 
                     onClick={() => setChartType('bar')}
                     className={`p-2 rounded flex items-center gap-2 text-sm font-medium transition-colors ${chartType === 'bar' ? 'bg-[#2b90d9] text-white' : 'text-[#9baec8] hover:text-white'}`}
-                    title="Bar Chart"
+                    title={t('stats.bar')}
                  >
                     <BarChart3 className="w-4 h-4" />
-                    <span className="hidden sm:inline">Bar</span>
+                    <span className="hidden sm:inline">{t('stats.bar')}</span>
                  </button>
               </div>
           </div>
@@ -559,9 +574,9 @@ export function StatsPage() {
                      fill="#1f232b" 
                      tickFormatter={(val) => val.slice(5)}
                   />
-                  <Line name="Original" type="monotone" dataKey="original" stroke="#e5c500" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
-                  <Line name="Replies" type="monotone" dataKey="reply" stroke="#8c8dff" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
-                  <Line name="Boosts" type="monotone" dataKey="boost" stroke="#ff5050" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+                  <Line name={t('stats.original')} type="monotone" dataKey="original" stroke="#e5c500" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+                  <Line name={t('stats.reply')} type="monotone" dataKey="reply" stroke="#8c8dff" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+                  <Line name={t('stats.boosts')} type="monotone" dataKey="boost" stroke="#ff5050" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
                 </LineChart>
               ) : (
                 <BarChart data={trendData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
@@ -589,9 +604,9 @@ export function StatsPage() {
                      fill="#1f232b" 
                      tickFormatter={(val) => val.slice(5)}
                   />
-                  <Bar name="Original" dataKey="original" stackId="a" fill="#e5c500" />
-                  <Bar name="Replies" dataKey="reply" stackId="a" fill="#8c8dff" />
-                  <Bar name="Boosts" dataKey="boost" stackId="b" fill="#ff5050" />
+                  <Bar name={t('stats.original')} dataKey="original" stackId="a" fill="#e5c500" />
+                  <Bar name={t('stats.reply')} dataKey="reply" stackId="a" fill="#8c8dff" />
+                  <Bar name={t('stats.boosts')} dataKey="boost" stackId="b" fill="#ff5050" />
                 </BarChart>
               )}
             </ResponsiveContainer>
