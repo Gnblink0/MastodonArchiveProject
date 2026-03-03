@@ -1,5 +1,7 @@
 # Mastodon Archive Viewer
 
+<img width="1214" height="369" alt="image" src="https://github.com/user-attachments/assets/7cf14843-6c5a-45a1-abbe-7e92bf3f4fae" />
+
 A pure frontend Mastodon archive viewer with persistent local storage. Upload your archive once, and browse your posts forever - no backend server required.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
