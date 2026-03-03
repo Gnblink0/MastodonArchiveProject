@@ -221,31 +221,17 @@ function App() {
             />
          </div>
 
-         <footer className="relative z-30 w-full py-16 border-t border-mastodon-border/30 bg-mastodon-bg/50 backdrop-blur-md mt-12">
-            <div className="max-w-4xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
-               <div className="flex flex-col items-center md:items-start">
-                  <div className="flex items-center gap-3 mb-3">
-                     <img src={headerLogo} alt="" className="w-8 h-8 object-contain" />
-                     <span className="text-xl font-bold text-white tracking-tight">Pastodon</span>
-                  </div>
-                  <p className="text-sm text-mastodon-text-secondary max-w-xs text-center md:text-left leading-relaxed">
-                     {t('common.archive_viewer')} — Your personal history, visualized.
-                  </p>
-               </div>
-               
-               <div className="flex flex-col items-center md:items-end gap-4">
-                  <div className="flex items-center gap-6 text-sm font-semibold text-mastodon-text-primary">
-                     <a href="https://github.com/Gnblink0/Pastodon" target="_blank" rel="noopener noreferrer" className="hover:text-mastodon-primary transition-colors">
-                        GitHub
-                     </a>
-                     <span className="w-1.5 h-1.5 rounded-full bg-mastodon-border" />
-                     <span className="text-mastodon-text-secondary font-medium">Open Source</span>
-                     <span className="w-1.5 h-1.5 rounded-full bg-mastodon-border" />
-                     <span className="text-mastodon-text-secondary font-medium">Privacy First</span>
-                  </div>
-                  <div className="text-xs text-mastodon-text-tertiary text-center md:text-right space-y-1">
-                     <p>© {new Date().getFullYear()} Pastodon Project. Made with ❤️ for the Fediverse.</p>
-                  </div>
+         {/* Footer */}
+         <footer className="relative z-30 w-full py-10 border-t border-mastodon-border/20 bg-mastodon-bg/50 backdrop-blur-sm mt-12">
+            <div className="max-w-4xl mx-auto px-4 text-center space-y-2 text-sm text-mastodon-text-secondary">
+               <p>Made by 🐻‍❄️ with ❤️ for the Fediverse community</p>
+               <div className="flex flex-wrap justify-center items-center gap-x-2 gap-y-1 text-mastodon-text-tertiary">
+                  <a href="https://github.com/Gnblink0/MastodonArchiveProject" target="_blank" rel="noopener noreferrer" className="text-mastodon-text-secondary hover:text-mastodon-primary transition-colors underline underline-offset-2">
+                    Open Source on GitHub
+                  </a>
+                  <span>— Stars ⭐ & contributions welcome!</span>
+                  <span className="hidden sm:inline mx-1 text-mastodon-border">•</span>
+                  <span>© {new Date().getFullYear()} Pastodon Project</span>
                </div>
             </div>
          </footer>
