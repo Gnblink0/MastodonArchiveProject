@@ -1,8 +1,11 @@
 import { useCallback, useState, useEffect } from 'react'
-import { Upload, FileArchive, Loader2, Cloud, ArrowRight, Eye } from 'lucide-react'
+import { Upload, FileArchive, Loader2, Cloud, ArrowRight, Eye, X, ChevronRight } from 'lucide-react'
+import step1Img from '../../assets/step1.png'
+import step2Img from '../../assets/step2.png'
 import { ArchiveParser } from '../../lib/parser'
 import { ImportStrategyDialog } from './ImportStrategyDialog'
 import { loadSampleData } from '../../lib/sampleData'
+import { useTranslation } from 'react-i18next'
 import type { ParseProgress, ImportStrategy, AccountConflict } from '../../types'
 
 interface UploadZoneProps {
@@ -13,6 +16,7 @@ interface UploadZoneProps {
 }
 
 export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAccessToken }: UploadZoneProps) {
+  const { t } = useTranslation()
   const [uploading, setUploading] = useState(false)
   const [driveLoading, setDriveLoading] = useState(false)
   const [loadingSample, setLoadingSample] = useState(false)
@@ -24,6 +28,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
   const [driveFiles, setDriveFiles] = useState<any[]>([])
   const [hasCheckedFiles, setHasCheckedFiles] = useState(false)
   const [showSlowDownloadTip, setShowSlowDownloadTip] = useState(false)
+  const [showGuide, setShowGuide] = useState(false)
 
   // Import strategy dialog state
   const [showStrategyDialog, setShowStrategyDialog] = useState(false)
@@ -79,7 +84,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
     }
 
     setDriveLoading(true)
-    setDriveStatus('Downloading from Drive...')
+    setDriveStatus(t('upload.downloading_from_drive'))
     setUploadProgress(-1)
     setError(null)
     setShowSlowDownloadTip(false)
@@ -89,7 +94,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
       let files = driveFiles
 
       if (files.length === 0) {
-        setDriveStatus('Searching for archives in Drive...')
+        setDriveStatus(t('upload.searching_archives'))
         const query = "name contains 'archive' and trashed = false"
         const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,size,createdTime,mimeType)`
 
@@ -110,7 +115,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
         )
 
         if (files.length === 0) {
-          throw new Error('No Mastodon archive (.tar.gz/.zip) found in your Drive.\nPlease upload your archive file first.')
+          throw new Error(t('upload.no_archive_in_drive'))
         }
 
         // Sort by createdTime desc (newest first)
@@ -119,7 +124,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
 
       const latestFile = files[0]
       const totalBytes = parseInt(latestFile.size, 10) || 0
-      setDriveStatus(`Downloading ${latestFile.name}...`)
+      setDriveStatus(`${t('upload.processing')} ${latestFile.name}...`)
 
       // 2. Download the file using Fetch API with streaming for better mobile compatibility
       const downloadUrl = `https://www.googleapis.com/drive/v3/files/${latestFile.id}?alt=media`
@@ -217,7 +222,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
 
                      setUploadProgress(Math.min(percentComplete, 99))
                      setDriveStatus(
-                        `${Math.round(percentComplete)}% • ${formatBytes(speed)}/s • ${formatTime(eta)} remaining`
+                        `${Math.round(percentComplete)}% • ${formatBytes(speed)}/s • ${formatTime(eta)} ${t('upload.remaining')}`
                      )
                   } else {
                      // If no total size, show MB downloaded and speed
@@ -229,7 +234,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
             }
 
             // Combine all chunks into a single blob
-            setDriveStatus('Processing...')
+            setDriveStatus(t('upload.processing'))
             const combinedBlob = new Blob(chunks as BlobPart[])
             setUploadProgress(100)
             resolve(combinedBlob)
@@ -243,7 +248,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
       const file = new File([blob], latestFile.name, { type: 'application/gzip' })
 
       // 3. Parse
-      setDriveStatus('Processing archive...')
+      setDriveStatus(t('upload.processing'))
       setUploadProgress(-1) // Hide progress bar
       await handleFile(file)
 
@@ -281,13 +286,13 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
     const isValidFormat = fileName.endsWith('.zip') || fileName.endsWith('.tar.gz') || fileName.endsWith('.tgz')
 
     if (!isValidFormat) {
-      setError('请上传 .zip 或 .tar.gz 格式的 Mastodon 存档文件')
+      setError(t('upload.invalid_format'))
       return
     }
 
     // 检查文件大小
     if (file.size === 0) {
-      setError('文件为空，请选择有效的存档文件')
+      setError(t('upload.empty_file'))
       return
     }
 
@@ -298,7 +303,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
       await testChunk.arrayBuffer()
     } catch (err) {
       console.error('文件访问测试失败:', err)
-      setError('无法读取文件。请确保：\n1. 文件未被其他程序占用\n2. 文件没有被移动或删除\n3. 浏览器有权限访问该文件\n\n请关闭其他可能占用该文件的程序，然后重试。')
+      setError(t('upload.cannot_read'))
       return
     }
 
@@ -314,18 +319,18 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
       onUploadComplete()
     } catch (err) {
       console.error('解析失败:', err)
-      const errorMessage = err instanceof Error ? err.message : '存档解析失败，请检查文件格式'
+      const errorMessage = err instanceof Error ? err.message : t('upload.parse_failed')
 
       // 检查是否是文件读取权限错误
       if (errorMessage.includes('permission') || errorMessage.includes('could not be read')) {
-        setError('文件读取权限错误。可能的解决方法：\n1. 关闭可能占用文件的程序（如解压软件、杀毒软件）\n2. 将文件复制到其他位置后重试\n3. 检查文件是否损坏\n4. 尝试使用不同的浏览器')
+        setError(t('upload.permission_error'))
       } else {
         setError(errorMessage)
       }
     } finally {
       setUploading(false)
     }
-  }, [onUploadComplete, handleAccountConflict])
+  }, [onUploadComplete, handleAccountConflict, t])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -364,7 +369,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
             <Loader2 className="w-20 h-20 mx-auto animate-spin text-mastodon-primary" />
             <div>
               <p className="text-xl font-medium text-white mb-3">
-                {loadingSample ? 'Loading sample data...' : (progress?.stage || 'Processing...')}
+                {loadingSample ? t('upload.loading_sample') : (progress?.stage || t('upload.processing'))}
               </p>
               {!loadingSample && progress && progress.total > 0 && (
                 <div className="mt-4 space-y-3 max-w-md mx-auto">
@@ -394,7 +399,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
             </div>
             <div>
               <p className="text-xl font-semibold text-mastodon-error mb-2">
-                Upload Failed
+                {t('upload.upload_failed')}
               </p>
               <div className="text-sm text-mastodon-text-secondary mt-3 max-w-md mx-auto whitespace-pre-line text-left">
                 {error}
@@ -404,7 +409,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
               onClick={() => setError(null)}
               className="px-8 py-4 bg-mastodon-primary text-white rounded-lg hover:bg-mastodon-primary-hover transition-colors font-medium text-base cursor-pointer"
             >
-              Retry
+              {t('upload.retry')}
             </button>
           </div>
         )
@@ -412,23 +417,23 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
 
     if (mode === 'local') {
         return (
-          <div className="space-y-6"
+          <div className="space-y-5 px-4"
             onDrop={handleDrop}
             onDragOver={handleDragOver}
           >
-            <FileArchive className="w-20 h-20 mx-auto text-mastodon-text-secondary" />
+            <FileArchive className="w-12 h-12 mx-auto text-mastodon-text-secondary/60" />
             <div>
-              <p className="text-2xl font-semibold text-white mb-3">
-                Drag & Drop Mastodon Archive
+              <p className="text-lg font-medium text-white/90 mb-1">
+                {t('upload.drag_drop')}
               </p>
-              <p className="text-base text-mastodon-text-secondary">
-                or click to select file
+              <p className="text-sm text-mastodon-text-secondary">
+                {t('upload.or_click')}
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 items-center justify-center">
-              <label className="inline-flex items-center gap-3 px-8 py-4 bg-mastodon-primary text-white rounded-lg cursor-pointer hover:bg-mastodon-primary-hover transition-colors font-semibold text-base">
-                <Upload className="w-5 h-5" />
-                Select File
+              <label className="inline-flex items-center gap-2.5 px-6 py-3 bg-mastodon-primary text-white rounded-xl cursor-pointer hover:bg-mastodon-primary-hover transition-colors font-semibold text-sm">
+                <Upload className="w-4 h-4" />
+                {t('upload.select_file')}
                 <input
                   type="file"
                   accept=".zip,application/zip,.tar.gz,application/gzip,application/x-gzip,.tgz"
@@ -438,14 +443,14 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
               </label>
               <button
                 onClick={handleLoadSample}
-                className="inline-flex items-center gap-3 px-8 py-4 bg-mastodon-surface border-2 border-mastodon-primary/30 text-mastodon-primary rounded-lg cursor-pointer hover:border-mastodon-primary hover:bg-mastodon-primary/10 transition-all font-semibold text-base"
+                className="inline-flex items-center gap-2.5 px-6 py-3 border border-white/10 text-mastodon-text-secondary rounded-xl cursor-pointer hover:border-mastodon-primary hover:text-mastodon-primary transition-all font-medium text-sm"
               >
-                <Eye className="w-5 h-5" />
-                Preview Sample
+                <Eye className="w-4 h-4" />
+                {t('upload.preview_sample')}
               </button>
             </div>
-            <p className="text-sm text-mastodon-text-secondary mt-6">
-              Supports .zip and .tar.gz archives exported from Mastodon
+            <p className="text-xs text-mastodon-text-secondary/50">
+              {t('upload.supports')}
             </p>
           </div>
         )
@@ -453,26 +458,26 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
     
     // Drive Mode
     return (
-        <div className="space-y-8 py-4">
-             <div className="text-center mb-8">
-                 <Cloud className="w-16 h-16 mx-auto text-[#34a853] mb-4" />
-                 <h2 className="text-2xl font-bold text-white mb-2">Sync with Google Drive</h2>
-                 <p className="text-mastodon-text-secondary max-w-md mx-auto">
-                    Upload your archive to your personal Drive to access it from any device, anywhere.
+        <div className="space-y-5 px-4">
+             <div className="text-center">
+                 <Cloud className="w-12 h-12 mx-auto text-[#34a853]/60 mb-3" />
+                 <h2 className="text-lg font-medium text-white/90 mb-1">{t('upload.sync_drive')}</h2>
+                 <p className="text-sm text-mastodon-text-secondary max-w-md mx-auto">
+                    {t('upload.sync_desc')}
                  </p>
              </div>
 
-             <div className="max-w-xs mx-auto space-y-4">
+             <div className="max-w-xs mx-auto space-y-3">
               {!googleUser ? (
                  <button
                     onClick={() => googleLogin?.()}
-                    className="w-full py-4 bg-[#34a853] hover:bg-[#34a853]/90 text-white rounded-lg transition-colors flex items-center justify-center gap-2 font-medium text-lg shadow-lg shadow-[#34a853]/20 cursor-pointer"
+                    className="w-full py-3 bg-[#34a853] hover:bg-[#34a853]/90 text-white rounded-xl transition-colors flex items-center justify-center gap-2 font-semibold text-sm cursor-pointer"
                  >
-                    <Cloud className="w-5 h-5" />
-                    <span>Login with Google</span>
+                    <Cloud className="w-4 h-4" />
+                    <span>{t('nav.login')}</span>
                  </button>
               ) : driveLoading ? (
-                 <div className="w-full bg-mastodon-surface border border-mastodon-border rounded-lg p-6 flex flex-col items-center justify-center space-y-4">
+                 <div className="w-full border border-white/[0.08] rounded-xl p-5 flex flex-col items-center justify-center space-y-3 bg-white/[0.02]">
                     {uploadProgress >= 0 && uploadProgress < 100 ? (
                        <div className="w-full space-y-3">
                           <div className="text-xs text-mastodon-text-secondary text-center">
@@ -499,13 +504,13 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
                  </div>
               ) : driveFiles.length === 0 ? (
                  // No files found - show only upload
-                 <div className="space-y-4">
-                    <p className="text-mastodon-text-secondary text-center text-sm mb-2">
-                       No archive found in your Drive. Please upload your Mastodon archive.
+                 <div className="space-y-3">
+                    <p className="text-mastodon-text-secondary text-center text-xs mb-1">
+                       {t('upload.no_archive_in_drive')}
                     </p>
-                    <label className="w-full py-4 bg-[#34a853] hover:bg-[#34a853]/90 text-white rounded-lg transition-colors flex items-center justify-center gap-3 font-medium cursor-pointer shadow-lg shadow-[#34a853]/20">
-                       <Upload className="w-5 h-5" />
-                       <span className="text-lg">Upload Archive</span>
+                    <label className="w-full py-3 bg-[#34a853] hover:bg-[#34a853]/90 text-white rounded-xl transition-colors flex items-center justify-center gap-2.5 font-semibold text-sm cursor-pointer">
+                       <Upload className="w-4 h-4" />
+                       <span>{t('upload.upload_new')}</span>
                        <input
                           type="file"
                           accept=".tar.gz,.tgz,.zip"
@@ -573,27 +578,29 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
                     {googleUser && (
                         <div className="text-center pt-2">
                             <p className="text-xs text-mastodon-text-secondary">
-                                Logged in as <span className="text-white">{googleUser.name}</span>
+                                {t('nav.logged_in_as', { name: googleUser.name })}
                             </p>
                         </div>
                     )}
                  </div>
               ) : (
                  // Files found - show file info and both upload/download options
-                 <div className="space-y-4">
-                    <div className="bg-mastodon-surface border border-mastodon-border rounded-lg p-4 mb-2">
-                       <p className="text-xs text-mastodon-text-secondary mb-1">Archive in Drive:</p>
-                       <p className="text-sm text-white font-medium truncate">{driveFiles[0].name}</p>
+                 <div className="space-y-3">
+                    <div className="border border-white/[0.08] rounded-xl p-3 bg-white/[0.02]">
+                       <p className="text-[10px] text-mastodon-text-secondary mb-0.5">{t('upload.archive_in_drive')}</p>
+                       <p className="text-xs text-white font-medium truncate">{driveFiles[0].name}</p>
                        {driveFiles.length > 1 && (
-                          <p className="text-xs text-mastodon-text-secondary mt-1">
-                             +{driveFiles.length - 1} more archive{driveFiles.length > 2 ? 's' : ''}
+                          <p className="text-[10px] text-mastodon-text-secondary mt-0.5">
+                             {driveFiles.length > 2
+                                ? t('upload.more_archives_plural', { count: driveFiles.length - 1 })
+                                : t('upload.more_archives', { count: driveFiles.length - 1 })}
                           </p>
                        )}
                     </div>
 
-                    <label className="w-full py-4 bg-[#34a853] hover:bg-[#34a853]/90 text-white rounded-lg transition-colors flex items-center justify-center gap-3 font-medium cursor-pointer shadow-lg shadow-[#34a853]/20">
-                       <Upload className="w-5 h-5" />
-                       <span className="text-lg">Upload New Archive</span>
+                    <label className="w-full py-3 bg-[#34a853] hover:bg-[#34a853]/90 text-white rounded-xl transition-colors flex items-center justify-center gap-2.5 font-semibold text-sm cursor-pointer">
+                       <Upload className="w-4 h-4" />
+                       <span>{t('upload.upload_new')}</span>
                        <input
                           type="file"
                           accept=".tar.gz,.tgz,.zip"
@@ -660,16 +667,16 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
 
                     <button
                        onClick={handleDriveImport}
-                       className="w-full py-4 bg-mastodon-surface border-2 border-[#34a853]/30 hover:border-[#34a853] text-[#34a853] rounded-lg transition-all flex items-center justify-center gap-3 font-medium cursor-pointer"
+                       className="w-full py-3 border border-white/10 hover:border-[#34a853]/50 text-[#34a853] rounded-xl transition-all flex items-center justify-center gap-2.5 font-medium text-sm cursor-pointer"
                     >
-                       <ArrowRight className="w-5 h-5" />
-                       <span className="text-lg">Download from Cloud</span>
+                       <ArrowRight className="w-4 h-4" />
+                       <span>{t('upload.download_cloud')}</span>
                     </button>
 
                     {googleUser && (
                         <div className="text-center pt-2">
                             <p className="text-xs text-mastodon-text-secondary">
-                                Logged in as <span className="text-white">{googleUser.name}</span>
+                                {t('nav.logged_in_as', { name: googleUser.name })}
                             </p>
                         </div>
                     )}
@@ -681,9 +688,9 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-6 py-12">
+    <div className="w-full max-w-2xl mx-auto px-6 py-2">
       <div
-        className={`border-2 border-dashed ${mode === 'local' ? 'border-mastodon-border hover:border-mastodon-primary cursor-pointer' : 'border-mastodon-border/50'} rounded-lg py-12 text-center bg-mastodon-surface transition-all duration-300 min-h-[400px] flex items-center justify-center`}
+        className={`border border-dashed ${mode === 'local' ? 'border-white/[0.08] hover:border-mastodon-primary/50 cursor-pointer' : 'border-white/[0.08]'} rounded-2xl py-8 text-center bg-white/[0.02] transition-all duration-300 flex items-center justify-center`}
         onDrop={mode === 'local' ? handleDrop : undefined}
         onDragOver={mode === 'local' ? handleDragOver : undefined}
       >
@@ -691,34 +698,41 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
       </div>
 
       {!uploading && !error && (
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
            {/* Left Card */}
-           <div className="p-6 bg-mastodon-surface border border-mastodon-border rounded-lg group hover:border-mastodon-border/80 transition-colors">
+           <div
+              className={`p-5 border border-white/[0.06] rounded-xl group hover:border-white/10 transition-colors bg-white/[0.02] ${mode === 'local' ? 'cursor-pointer' : ''}`}
+              onClick={mode === 'local' ? () => setShowGuide(true) : undefined}
+           >
               {mode === 'local' ? (
                   <>
-                    <h3 className="text-base font-semibold text-mastodon-primary mb-4 flex items-center gap-2">
-                        <Upload className="w-4 h-4" />
-                        <span>How to get your archive?</span>
+                    <h3 className="text-sm font-semibold text-mastodon-primary mb-3 flex items-center gap-2">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>{t('upload.how_to_get')}</span>
                     </h3>
-                    <ol className="text-sm text-mastodon-text-secondary space-y-2 list-decimal list-inside">
-                        <li>Log in to your Mastodon account</li>
-                        <li>Go to Settings → Import and Export</li>
-                        <li>Request Archive & wait for email</li>
-                        <li>Download .tar.gz file</li>
+                    <ol className="text-xs text-mastodon-text-secondary space-y-1.5 list-decimal list-inside">
+                        <li>{t('upload.step_1')}</li>
+                        <li>{t('upload.step_2')}</li>
+                        <li>{t('upload.step_3')}</li>
+                        <li>{t('upload.step_4')}</li>
                     </ol>
+                    <div className="flex items-center text-mastodon-primary text-xs font-medium mt-3 group-hover:gap-1.5 transition-all">
+                        <span>{t('upload.click_to_see_guide')}</span>
+                        <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                    </div>
                   </>
               ) : (
                   <>
-                    <h3 className="text-base font-semibold text-[#34a853] mb-4 flex items-center gap-2">
-                        <Cloud className="w-4 h-4" />
-                        <span>How does sync work?</span>
+                    <h3 className="text-sm font-semibold text-[#34a853] mb-3 flex items-center gap-2">
+                        <Cloud className="w-3.5 h-3.5" />
+                        <span>{t('upload.how_sync_works')}</span>
                     </h3>
-                    <div className="text-sm text-mastodon-text-secondary space-y-3">
+                    <div className="text-xs text-mastodon-text-secondary space-y-2">
                         <p>
-                            <strong className="text-white">Archive Sync:</strong> Log in to Google and enable Google Drive. Your Mastodon archive will be stored in your own Google Drive for remote sync. This website does not store or access any of your Mastodon data.
+                            <strong className="text-white">{t('upload.sync_sync_title')}</strong> {t('upload.sync_sync_desc')}
                         </p>
                         <p>
-                            <strong className="text-white">Local Parsing:</strong> Each archive is parsed locally in your browser but will be persistently saved and won't disappear on refresh.
+                            <strong className="text-white">{t('upload.sync_local_title')}</strong> {t('upload.sync_local_desc')}
                         </p>
                     </div>
                   </>
@@ -726,8 +740,8 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
            </div>
 
            {/* Right Card / Toggle */}
-           <div 
-                className="p-6 bg-mastodon-surface border border-mastodon-border rounded-lg cursor-pointer hover:border-[#34a853] transition-all group relative overflow-hidden"
+           <div
+                className="p-5 border border-white/[0.06] rounded-xl cursor-pointer hover:border-[#34a853]/40 transition-all group relative overflow-hidden bg-white/[0.02]"
                 onClick={() => setMode(mode === 'local' ? 'drive' : 'local')}
            >
               {mode === 'local' ? (
@@ -735,13 +749,13 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
                     <div className="relative z-10">
                         <h3 className="text-base font-semibold text-[#34a853] mb-2 flex items-center gap-2">
                             <Cloud className="w-4 h-4" />
-                            <span>Sync with Google Drive</span>
+                            <span>{t('upload.sync_drive')}</span>
                         </h3>
                         <p className="text-sm text-mastodon-text-secondary mb-4">
-                            Upload archive to Drive to access from other devices.
+                            {t('upload.sync_desc')}
                         </p>
                         <div className="flex items-center text-[#34a853] text-sm font-medium group-hover:gap-2 transition-all">
-                            <span>Switch to Sync Mode</span>
+                            <span>{t('upload.switch_sync')}</span>
                             <ArrowRight className="w-4 h-4 ml-1" />
                         </div>
                     </div>
@@ -753,13 +767,13 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
                     <div className="relative z-10">
                         <h3 className="text-base font-semibold text-mastodon-primary mb-2 flex items-center gap-2">
                             <Upload className="w-4 h-4" />
-                            <span>Local Upload</span>
+                            <span>{t('upload.local_upload')}</span>
                         </h3>
                         <p className="text-sm text-mastodon-text-secondary mb-4">
-                            Upload directly from your computer without syncing.
+                            {t('upload.local_desc')}
                         </p>
                         <div className="flex items-center text-mastodon-primary text-sm font-medium group-hover:gap-2 transition-all">
-                            <span>Switch to Local Mode</span>
+                            <span>{t('upload.switch_local')}</span>
                             <ArrowRight className="w-4 h-4 ml-1" />
                         </div>
                     </div>
@@ -776,6 +790,58 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
           conflict={currentConflict}
           onSelect={handleStrategySelect}
         />
+      )}
+
+      {/* Guide Modal */}
+      {showGuide && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowGuide(false)}>
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div
+            className="relative bg-mastodon-surface border border-white/10 rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="sticky top-0 bg-mastodon-surface/95 backdrop-blur-sm border-b border-white/[0.06] px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+              <h2 className="text-lg font-bold text-white">{t('upload.guide_title')}</h2>
+              <button
+                onClick={() => setShowGuide(false)}
+                className="text-mastodon-text-secondary hover:text-white transition-colors cursor-pointer p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Step 1 */}
+            <div className="px-6 py-5 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-6 h-6 rounded-full bg-mastodon-primary/20 text-mastodon-primary text-xs font-bold flex items-center justify-center">1</span>
+                <h3 className="text-sm font-semibold text-white">{t('upload.guide_step1_title')}</h3>
+              </div>
+              <p className="text-xs text-mastodon-text-secondary mb-3 ml-8">{t('upload.guide_step1_desc')}</p>
+              <img src={step1Img} alt="Step 1" className="w-full rounded-lg border border-white/[0.06]" />
+            </div>
+
+            {/* Step 2 */}
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-6 h-6 rounded-full bg-mastodon-primary/20 text-mastodon-primary text-xs font-bold flex items-center justify-center">2</span>
+                <h3 className="text-sm font-semibold text-white">{t('upload.guide_step2_title')}</h3>
+              </div>
+              <p className="text-xs text-mastodon-text-secondary mb-3 ml-8">{t('upload.guide_step2_desc')}</p>
+              <img src={step2Img} alt="Step 2" className="w-full rounded-lg border border-white/[0.06]" />
+            </div>
+
+            {/* Close button */}
+            <div className="sticky bottom-0 bg-mastodon-surface/95 backdrop-blur-sm border-t border-white/[0.06] px-6 py-4 rounded-b-2xl">
+              <button
+                onClick={() => setShowGuide(false)}
+                className="w-full py-2.5 bg-mastodon-primary text-white rounded-xl hover:bg-mastodon-primary-hover transition-colors font-medium text-sm cursor-pointer"
+              >
+                {t('upload.guide_close')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

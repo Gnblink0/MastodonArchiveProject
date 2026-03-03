@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { UploadZone } from './UploadZone'
+import { useTranslation } from 'react-i18next'
 
 interface UploadModalProps {
   isOpen: boolean
@@ -18,6 +19,7 @@ export function UploadModal({
   googleLogin,
   googleAccessToken
 }: UploadModalProps) {
+  const { t } = useTranslation()
   if (!isOpen) return null
 
   const handleUploadComplete = () => {
@@ -45,7 +47,7 @@ export function UploadModal({
 
         {/* Upload Zone */}
         <div className="p-8">
-          <h2 className="text-2xl font-bold text-white mb-6">Import Another Archive</h2>
+          <h2 className="text-2xl font-bold text-white mb-6">{t('accounts.import_another')}</h2>
           <UploadZone
             onUploadComplete={handleUploadComplete}
             googleUser={googleUser}

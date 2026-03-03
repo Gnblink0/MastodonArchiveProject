@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Calendar, Loader2, ChevronLeft, ChevronRight, X, Undo2, Menu } from 'lucide-react'
 import { db } from '../lib/db'
 import type { Post } from '../types'
@@ -35,7 +34,6 @@ interface MemoriesPageProps {
 // ★ 修改：接收 onPostClick 参数
 export function MemoriesPage({ onPostClick, onMobileMenuToggle }: MemoriesPageProps) {
   const { t, i18n } = useTranslation()
-  const navigate = useNavigate()
   const { selectedAccountId } = useAccountFilter()
   
   const MONTHS = getMONTHS(t)
