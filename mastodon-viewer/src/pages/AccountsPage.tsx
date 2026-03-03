@@ -58,7 +58,7 @@ export function AccountsPage({ googleUser, googleLogin, googleAccessToken, onMob
 
   return (
     <div className="h-full overflow-auto">
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-8 flex items-start gap-4">
           {onMobileMenuToggle && (

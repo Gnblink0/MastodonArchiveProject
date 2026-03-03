@@ -578,7 +578,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
   }
 
   return (
-    <div className="h-full flex flex-col max-w-2xl mx-auto">
+    <div className="h-full flex flex-col max-w-3xl mx-auto w-full">
       {/* Search Bar and Mobile Menu Button */}
       <div className="px-4 pt-4 pb-2 flex items-center gap-2">
         {/* Mobile Menu Button */}

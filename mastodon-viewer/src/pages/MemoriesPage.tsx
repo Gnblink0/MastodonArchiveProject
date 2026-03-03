@@ -171,7 +171,7 @@ export function MemoriesPage({ onPostClick, onMobileMenuToggle }: MemoriesPagePr
   return (
     <div 
       ref={scrollContainerRef}
-      className="h-full overflow-y-auto max-w-2xl mx-auto relative scroll-smooth"
+      className="h-full overflow-y-auto max-w-3xl mx-auto relative scroll-smooth w-full"
     >
       
       {/* 日历弹窗 (Modal) */}

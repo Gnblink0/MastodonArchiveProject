@@ -93,7 +93,7 @@ export function InteractionsPage({ type, onMobileMenuToggle }: InteractionsPageP
   }
 
   return (
-    <div className="h-full flex flex-col max-w-4xl mx-auto">
+    <div className="h-full flex flex-col max-w-5xl mx-auto w-full">
       <div className="px-4 pt-8 pb-4 flex items-center justify-between">
          <div className="flex items-center gap-3">
             {onMobileMenuToggle && (

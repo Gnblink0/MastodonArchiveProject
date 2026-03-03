@@ -222,15 +222,14 @@ function App() {
          </div>
 
          {/* Footer */}
-         <footer className="relative z-30 w-full py-10 border-t border-mastodon-border/20 bg-mastodon-bg/50 backdrop-blur-sm mt-12">
-            <div className="max-w-4xl mx-auto px-4 text-center space-y-2 text-sm text-mastodon-text-secondary">
+         <footer className="w-full py-6 border-t border-mastodon-border/10 mt-12">
+            <div className="max-w-4xl mx-auto px-4 text-center space-y-2 text-sm text-mastodon-text-secondary/60">
                <p>Made by 🐻‍❄️ with ❤️ for the Fediverse community</p>
-               <div className="flex flex-wrap justify-center items-center gap-x-2 gap-y-1 text-mastodon-text-tertiary">
-                  <a href="https://github.com/Gnblink0/MastodonArchiveProject" target="_blank" rel="noopener noreferrer" className="text-mastodon-text-secondary hover:text-mastodon-primary transition-colors underline underline-offset-2">
+               <div className="flex flex-wrap justify-center items-center gap-x-2 gap-y-1 text-mastodon-text-tertiary/50">
+                  <a href="https://github.com/Gnblink0/MastodonArchiveProject" target="_blank" rel="noopener noreferrer" className="hover:text-mastodon-primary transition-colors underline underline-offset-2">
                     Open Source on GitHub
                   </a>
-                  <span>— Stars ⭐ & contributions welcome!</span>
-                  <span className="hidden sm:inline mx-1 text-mastodon-border">•</span>
+                  <span className="hidden sm:inline mx-1">•</span>
                   <span>© {new Date().getFullYear()} Pastodon Project</span>
                </div>
             </div>
