@@ -8,6 +8,10 @@ A pure frontend Mastodon archive viewer with persistent local storage. Upload yo
 ![React](https://img.shields.io/badge/React-19.2-61dafb.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6.svg)
 
+## 🚀 Live Demo
+
+[View Demo](https://mastodon.gnblink.com/)
+
 ## Features
 
 - **Persistent Storage** - Upload once, data stays in browser IndexedDB forever
@@ -21,9 +25,7 @@ A pure frontend Mastodon archive viewer with persistent local storage. Upload yo
 - **Mastodon-Style UI** - Familiar interface matching the Mastodon experience
 - **Zero Cost** - Static hosting, no server fees, completely free to deploy
 
-## 🚀 Live Demo
 
-[View Demo](https://mastodon-archive-project.vercel.app/)
 
 ## Why This Exists
 
