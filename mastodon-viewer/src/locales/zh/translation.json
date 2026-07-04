@@ -37,7 +37,9 @@
     "import_history_desc": "上传存档后，导入记录将显示在这里。",
     "loading_history": "加载历史记录中...",
     "replace": "替换",
-    "merge": "合并"
+    "merge": "合并",
+    "show_more": "显示更多",
+    "show_less": "收起"
   },
   "timeline": {
     "loaded_x_of_y": "已加载 {{count}} / {{total}} 条帖子",

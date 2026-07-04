@@ -46,6 +46,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
   // Tag filtering states
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
   const [tagPage, setTagPage] = useState(1)
+  const [showAllTags, setShowAllTags] = useState(false)
   const tags = useTags(selectedAccountId)
   const tagPosts = usePostsByTag(selectedTag || '', 20 * tagPage, 0, selectedAccountId)
   const tagPostsCount = usePostsByTagCount(selectedTag || '', selectedAccountId)
@@ -663,12 +664,25 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
       {/* Tag Filter Pills - Show top tags */}
       {!query && !jumpedPosts && !selectedTag && tags && tags.length > 0 && (
         <div className="px-4 pb-2">
-          <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar py-2">
-            <div className="flex items-center gap-1.5 text-mastodon-text-secondary flex-shrink-0">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-1.5 text-mastodon-text-secondary">
               <Hash className="w-4 h-4" />
               <span className="text-sm font-medium">{t('nav.tags')}:</span>
             </div>
-            {tags.slice(0, 10).map(({ tag, count }) => (
+            <span className="text-xs text-mastodon-text-tertiary">
+              {tags.length} {t('tags.total_tags')}
+            </span>
+            {tags.length > 15 && (
+              <button
+                onClick={() => setShowAllTags(!showAllTags)}
+                className="ml-auto text-sm text-mastodon-primary hover:text-mastodon-primary-hover cursor-pointer transition-colors"
+              >
+                {showAllTags ? t('common.show_less') : t('common.show_more')}
+              </button>
+            )}
+          </div>
+          <div className={`flex flex-wrap gap-2 ${!showAllTags && tags.length > 15 ? 'max-h-20 overflow-hidden' : ''}`}>
+            {(showAllTags ? tags : tags.slice(0, 15)).map(({ tag, count }) => (
               <button
                 key={tag}
                 onClick={() => handleTagClick(tag)}
@@ -678,11 +692,6 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
                 <span className="text-xs text-mastodon-text-tertiary">{count}</span>
               </button>
             ))}
-            {tags.length > 10 && (
-              <span className="text-sm text-mastodon-text-tertiary flex-shrink-0">
-                +{tags.length - 10}
-              </span>
-            )}
           </div>
         </div>
       )}

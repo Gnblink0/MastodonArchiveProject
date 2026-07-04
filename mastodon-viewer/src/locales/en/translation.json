@@ -37,7 +37,9 @@
     "import_history_desc": "Import records will appear here after you upload an archive.",
     "loading_history": "Loading history...",
     "replace": "Replace",
-    "merge": "Merge"
+    "merge": "Merge",
+    "show_more": "Show more",
+    "show_less": "Show less"
   },
   "timeline": {
     "loaded_x_of_y": "Loaded {{count}} of {{total}} posts",
