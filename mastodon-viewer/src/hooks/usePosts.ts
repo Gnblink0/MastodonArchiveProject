@@ -134,3 +134,65 @@ export function useMedia(mediaIds: string[]) {
     [mediaIds.join(',')]
   )
 }
+
+// 获取所有标签及其计数（支持按账号过滤）
+export function useTags(accountId?: string) {
+  return useLiveQuery(async () => {
+    let posts
+    if (accountId) {
+      posts = await db.posts.where('accountId').equals(accountId).toArray()
+    } else {
+      posts = await db.posts.toArray()
+    }
+
+    // 统计每个标签的数量
+    const tagCounts = new Map<string, number>()
+    posts.forEach(post => {
+      post.tags.forEach(tag => {
+        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1)
+      })
+    })
+
+    // 转换为数组并按计数排序
+    return Array.from(tagCounts.entries())
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+  }, [accountId])
+}
+
+// 按标签获取帖子（支持按账号过滤）
+export function usePostsByTag(tag: string, limit = 20, offset = 0, accountId?: string) {
+  return useLiveQuery(
+    async () => {
+      let query = db.posts.where('tags').equals(tag)
+
+      // 如果需要按账号过滤，需要在获取后再过滤（因为 Dexie 不支持复合 multi-entry 索引）
+      const posts = await query.toArray()
+
+      let filteredPosts = posts
+      if (accountId) {
+        filteredPosts = posts.filter(p => p.accountId === accountId)
+      }
+
+      // 按时间戳倒序排序
+      filteredPosts.sort((a, b) => b.timestamp - a.timestamp)
+
+      // 应用分页
+      return filteredPosts.slice(offset, offset + limit)
+    },
+    [tag, limit, offset, accountId]
+  )
+}
+
+// 获取指定标签的帖子总数（支持按账号过滤）
+export function usePostsByTagCount(tag: string, accountId?: string) {
+  return useLiveQuery(async () => {
+    const posts = await db.posts.where('tags').equals(tag).toArray()
+
+    if (accountId) {
+      return posts.filter(p => p.accountId === accountId).length
+    }
+
+    return posts.length
+  }, [tag, accountId])
+}

@@ -6,6 +6,7 @@
     "favourites": "收藏",
     "bookmarks": "书签",
     "memories": "往年今日",
+    "tags": "标签",
     "login": "使用 Google 登录",
     "logout": "注销",
     "clear_data": "清除所有数据",
@@ -157,6 +158,13 @@
     "nothing_for": "您的存档中没有 {{date}} 的内容。",
     "check_yesterday": "查看昨天",
     "end_of_year": "{{year}} 年结束"
+  },
+  "tags": {
+    "total_tags": "个标签",
+    "no_tags": "您的帖子中未找到标签。",
+    "posts_count": "{{count}} 条嘟嘟",
+    "posts_count_plural": "{{count}} 条嘟嘟",
+    "no_posts_with_tag": "未找到包含此标签的嘟嘟。"
   },
   "post": {
     "boosted": "已转推",

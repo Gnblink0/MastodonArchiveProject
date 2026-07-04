@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { PostCard } from './PostCard'
-import { usePostsCount } from '../../hooks/usePosts'
-import { Loader2, Search as SearchIcon, X, Menu, Calendar } from 'lucide-react'
+import { usePostsCount, useTags, usePostsByTag, usePostsByTagCount } from '../../hooks/usePosts'
+import { Loader2, Search as SearchIcon, X, Menu, Calendar, Hash } from 'lucide-react'
 import { db } from '../../lib/db'
 import type { Post } from '../../types'
 import Fuse from 'fuse.js'
@@ -43,6 +43,13 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
   const [jumpedPosts, setJumpedPosts] = useState<Post[] | null>(null)
   const [isLoadingJumped, setIsLoadingJumped] = useState(false)
 
+  // Tag filtering states
+  const [selectedTag, setSelectedTag] = useState<string | null>(null)
+  const [tagPage, setTagPage] = useState(1)
+  const tags = useTags(selectedAccountId)
+  const tagPosts = usePostsByTag(selectedTag || '', 20 * tagPage, 0, selectedAccountId)
+  const tagPostsCount = usePostsByTagCount(selectedTag || '', selectedAccountId)
+
   // Pull-to-refresh states
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [pullDistance, setPullDistance] = useState(0)
@@ -55,7 +62,11 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
   const hasRestoredScroll = useRef(false) // Track if we've already restored scroll position
 
   // --- Derived State (must be before virtualizer) ---
-  const displayedPosts = query ? searchResults : (jumpedPosts || timelinePosts)
+  const displayedPosts = query
+    ? searchResults
+    : selectedTag
+      ? (tagPosts || [])
+      : (jumpedPosts || timelinePosts)
 
   // --- Virtualizer Setup ---
   const rowVirtualizer = useVirtualizer({
@@ -319,7 +330,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
 
   // Infinite scroll: detect when we're near the end (for scrolling down only)
   useEffect(() => {
-    if (query) return // Don't load more when searching
+    if (query || selectedTag) return // Don't auto-load when searching or filtering by tag
 
     const virtualItems = rowVirtualizer.getVirtualItems()
     if (virtualItems.length === 0) return
@@ -359,7 +370,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
         loadMore()
       }
     }
-  }, [rowVirtualizer.getVirtualItems(), hasMore, isLoading, loadMore, displayedPosts.length, query, jumpedPosts, isLoadingJumped])
+  }, [rowVirtualizer.getVirtualItems(), hasMore, isLoading, loadMore, displayedPosts.length, query, jumpedPosts, isLoadingJumped, selectedTag])
 
   // Track current visible month for highlighting and scroll position
   useEffect(() => {
@@ -504,6 +515,8 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
   const handleSearch = (val: string) => {
     setQuery(val)
     setJumpedPosts(null) // Clear jumped posts when searching
+    setSelectedTag(null) // Clear tag filter when searching
+    setTagPage(1)
     setSearchParams({}) // Clear URL params when searching
   }
 
@@ -513,6 +526,26 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
     setIsSearching(false)
     setJumpedPosts(null)
     setSearchParams({}) // Clear URL params
+  }
+
+  const handleTagClick = (tag: string) => {
+    setSelectedTag(tag)
+    setTagPage(1)
+    setQuery('') // Clear search when filtering by tag
+    setJumpedPosts(null) // Clear jumped posts when filtering by tag
+    setSearchParams({}) // Clear URL params
+    // Scroll to top
+    parentRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const clearTagFilter = () => {
+    setSelectedTag(null)
+    setTagPage(1)
+    parentRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const loadMoreTagPosts = () => {
+    setTagPage(prev => prev + 1)
   }
 
   // Handle month click from timeline drawer
@@ -627,8 +660,54 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
         </button>
       </div>
 
+      {/* Tag Filter Pills - Show top tags */}
+      {!query && !jumpedPosts && !selectedTag && tags && tags.length > 0 && (
+        <div className="px-4 pb-2">
+          <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar py-2">
+            <div className="flex items-center gap-1.5 text-mastodon-text-secondary flex-shrink-0">
+              <Hash className="w-4 h-4" />
+              <span className="text-sm font-medium">{t('nav.tags')}:</span>
+            </div>
+            {tags.slice(0, 10).map(({ tag, count }) => (
+              <button
+                key={tag}
+                onClick={() => handleTagClick(tag)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-mastodon-surface hover:bg-mastodon-primary/20 text-mastodon-text-primary hover:text-mastodon-primary rounded-full text-sm whitespace-nowrap transition-colors cursor-pointer border border-mastodon-border hover:border-mastodon-primary"
+              >
+                <span className="font-medium">#{tag}</span>
+                <span className="text-xs text-mastodon-text-tertiary">{count}</span>
+              </button>
+            ))}
+            {tags.length > 10 && (
+              <span className="text-sm text-mastodon-text-tertiary flex-shrink-0">
+                +{tags.length - 10}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Selected Tag Indicator */}
+      {selectedTag && (
+        <div className="px-4 pb-2">
+          <div className="flex items-center gap-2 bg-mastodon-surface rounded-lg p-3 border border-mastodon-border">
+            <Hash className="w-5 h-5 text-mastodon-primary flex-shrink-0" />
+            <span className="text-white font-semibold">#{selectedTag}</span>
+            <span className="text-sm text-mastodon-text-secondary">
+              ({tagPostsCount || 0} {t('tags.posts_count', { count: tagPostsCount || 0 })})
+            </span>
+            <button
+              onClick={clearTagFilter}
+              className="ml-auto text-mastodon-text-secondary hover:text-white cursor-pointer transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Posts count indicator */}
-      {!query && !jumpedPosts && totalCountDB && (
+      {!query && !jumpedPosts && !selectedTag && totalCountDB && (
         <div className="px-4 pb-2 text-sm text-mastodon-text-secondary text-center">
           {t('timeline.loaded_x_of_y', { count: displayedPosts.length, total: totalCountDB })}
         </div>
@@ -750,7 +829,7 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
             })}
 
             {/* Loading indicator at the bottom */}
-            {!query && (isLoading || isLoadingJumped) && (jumpedPosts ? true : hasMore) && (
+            {!query && !selectedTag && (isLoading || isLoadingJumped) && (jumpedPosts ? true : hasMore) && (
               <div
                 style={{
                   position: 'absolute',
@@ -764,8 +843,43 @@ export function Timeline({ onPostClick, setMobileMenuOpen, ...props }: TimelineP
               </div>
             )}
 
+            {/* Load More button for tag filtering */}
+            {selectedTag && tagPosts && tagPostsCount && (tagPage * 20 < tagPostsCount) && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: `${rowVirtualizer.getTotalSize()}px`,
+                  left: 0,
+                  width: '100%',
+                }}
+                className="flex justify-center py-8"
+              >
+                <button
+                  onClick={loadMoreTagPosts}
+                  className="px-6 py-3 bg-mastodon-surface hover:bg-mastodon-surface/80 text-mastodon-primary font-medium rounded-xl border border-mastodon-border transition-colors cursor-pointer"
+                >
+                  {t('timeline.load_earlier')}
+                </button>
+              </div>
+            )}
+
             {/* End of timeline indicator */}
-            {!query && !hasMore && displayedPosts.length > 0 && (
+            {!query && !hasMore && !selectedTag && displayedPosts.length > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: `${rowVirtualizer.getTotalSize()}px`,
+                  left: 0,
+                  width: '100%',
+                }}
+                className="text-center py-8 text-mastodon-text-secondary text-sm"
+              >
+                {t('timeline.end_of_timeline')}
+              </div>
+            )}
+
+            {/* End of tag posts indicator */}
+            {selectedTag && tagPosts && tagPostsCount && (tagPage * 20 >= tagPostsCount) && displayedPosts.length > 0 && (
               <div
                 style={{
                   position: 'absolute',

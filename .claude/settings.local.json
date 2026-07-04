@@ -8,7 +8,8 @@
       "Bash(npm run build:*)",
       "Bash(npm uninstall:*)",
       "Bash(cat:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npm run dev:*)"
     ]
   }
 }

@@ -6,6 +6,7 @@
     "favourites": "Favourites",
     "bookmarks": "Bookmarks",
     "memories": "Memories",
+    "tags": "Tags",
     "login": "Login with Google",
     "logout": "Logout",
     "clear_data": "Clear Data",
@@ -157,6 +158,13 @@
     "nothing_for": "Nothing in your archive for {{date}}.",
     "check_yesterday": "Check Yesterday",
     "end_of_year": "End of {{year}}"
+  },
+  "tags": {
+    "total_tags": "tags",
+    "no_tags": "No tags found in your posts.",
+    "posts_count": "{{count}} post",
+    "posts_count_plural": "{{count}} posts",
+    "no_posts_with_tag": "No posts found with this tag."
   },
   "post": {
     "boosted": "Boosted",

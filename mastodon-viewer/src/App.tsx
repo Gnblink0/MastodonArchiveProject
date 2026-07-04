@@ -301,7 +301,7 @@ function App() {
             <span className="text-base">{t('nav.bookmarks')}</span>
          </button>
 
-         <button 
+         <button
             onClick={() => { navigate('/memories'); setMobileMenuOpen(false) }}
             className="flex items-center gap-4 px-4 py-2.5 text-mastodon-text-primary font-medium hover:bg-mastodon-surface hover:text-mastodon-primary transition-colors rounded-full cursor-pointer"
          >
