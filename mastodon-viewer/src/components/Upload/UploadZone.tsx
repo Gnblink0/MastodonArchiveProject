@@ -428,13 +428,14 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
 
   // Upload a file to Drive using a per-account stable name: overwrite the existing
   // file's content if one already exists, otherwise create a new file.
-  const uploadFileToDrive = async (file: File, accountId: string) => {
+  // `knownFiles` lets callers pass an already-fetched list to avoid a re-fetch.
+  const uploadFileToDrive = async (file: File, accountId: string, knownFiles?: any[]) => {
     if (!googleAccessToken) throw new Error('Not authenticated')
 
     const driveName = buildDriveName(accountId, file.name)
 
     // Look for an existing file with the same stable name
-    const files = await fetchDriveFiles()
+    const files = knownFiles ?? await fetchDriveFiles()
     const existing = files.find((f: any) => f.name === driveName)
 
     const onProgress = (event: ProgressEvent) => {
@@ -447,6 +448,8 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
 
     await new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest()
+      const fail = (label: string) =>
+        reject(new Error(`${label} (HTTP ${xhr.status})${xhr.responseText ? `: ${xhr.responseText}` : ''}`))
 
       if (existing) {
         // Update the content of the existing file (keeps same id/name)
@@ -454,8 +457,8 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
         xhr.setRequestHeader('Authorization', `Bearer ${googleAccessToken}`)
         xhr.setRequestHeader('Content-Type', file.type || 'application/gzip')
         xhr.upload.onprogress = onProgress
-        xhr.onload = () => (xhr.status === 200 ? resolve() : reject(new Error('Update failed')))
-        xhr.onerror = () => reject(new Error('Update failed'))
+        xhr.onload = () => (xhr.status === 200 ? resolve() : fail('Drive update failed'))
+        xhr.onerror = () => fail('Drive update failed')
         xhr.send(file)
       } else {
         // Create a new file
@@ -466,8 +469,8 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
         xhr.open('POST', 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart')
         xhr.setRequestHeader('Authorization', `Bearer ${googleAccessToken}`)
         xhr.upload.onprogress = onProgress
-        xhr.onload = () => (xhr.status === 200 ? resolve() : reject(new Error('Upload failed')))
-        xhr.onerror = () => reject(new Error('Upload failed'))
+        xhr.onload = () => (xhr.status === 200 ? resolve() : fail('Drive upload failed'))
+        xhr.onerror = () => fail('Drive upload failed')
         xhr.send(form)
       }
     })
@@ -490,22 +493,38 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
 
     setDriveLoading(true)
     setError(null)
+    setDriveSearchError(null)
     setUploadProgress(-1)
     parseStageRef.current = null
 
     try {
+      // 0. Verify Drive is actually writable BEFORE importing, so we never show
+      //    a fake "success" (local import) when the backup can't happen — e.g.
+      //    the token is missing the Drive scope (403).
+      setDriveStatus(t('upload.searching_archives'))
+      let existingFiles: any[]
+      try {
+        existingFiles = await fetchDriveFiles()
+      } catch (err) {
+        // Surface as a Drive auth/scope problem (shows re-authorize button)
+        setDriveSearchError(err instanceof Error ? err.message : String(err))
+        return
+      }
+
       // 1. Parse + import locally to obtain the accountId
       setDriveStatus(t('upload.processing'))
       const parser = new ArchiveParser(trackProgress, handleAccountConflict)
       const metadata = await parser.parseArchive(file)
-      onUploadComplete()
 
       // 2. Upload to Drive under a stable per-account name (overwrite if exists)
       setUploadProgress(0)
       setDriveStatus(t('upload.uploading'))
-      await uploadFileToDrive(file, metadata.accountId)
+      await uploadFileToDrive(file, metadata.accountId, existingFiles)
 
-      // 3. Refresh the Drive file list
+      // 3. Only report success after the Drive upload actually succeeded
+      onUploadComplete()
+
+      // 4. Refresh the Drive file list
       const refreshed = await fetchDriveFiles()
       setDriveFiles(refreshed)
       setHasCheckedFiles(true)
