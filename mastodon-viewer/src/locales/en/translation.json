@@ -139,7 +139,8 @@
     "error_detail": "Error detail",
     "error_at_stage": "Failed at stage: {{stage}}",
     "copy_error": "Copy error",
-    "error_copied": "Copied!"
+    "error_copied": "Copied!",
+    "drive_search_failed": "Could not read the archive list from Drive"
   },
   "import_strategy": {
     "title": "Account Already Exists",

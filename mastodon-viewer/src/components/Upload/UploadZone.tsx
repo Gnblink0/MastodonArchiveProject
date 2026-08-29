@@ -30,6 +30,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
   const [showSlowDownloadTip, setShowSlowDownloadTip] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
   const [errorCopied, setErrorCopied] = useState(false)
+  const [driveSearchError, setDriveSearchError] = useState<string | null>(null)
 
   // Track the latest parse stage so error messages can say where it failed
   // (avoids reading the stale `progress` state inside catch closures)
@@ -66,7 +67,11 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
       headers: { Authorization: `Bearer ${googleAccessToken}` }
     })
 
-    if (!searchRes.ok) throw new Error('Failed to search Drive')
+    if (!searchRes.ok) {
+      let detail = ''
+      try { detail = await searchRes.text() } catch { /* ignore */ }
+      throw new Error(`Drive search failed (HTTP ${searchRes.status})${detail ? `: ${detail}` : ''}`)
+    }
 
     const data = await searchRes.json()
     let files = data.files || []
@@ -88,15 +93,34 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
   const searchDriveFiles = useCallback(async () => {
     if (!googleAccessToken || hasCheckedFiles) return
 
+    setDriveSearchError(null)
     try {
       const files = await fetchDriveFiles()
       setDriveFiles(files)
       setHasCheckedFiles(true)
     } catch (err) {
       console.error('Error searching Drive files:', err)
+      // Surface the failure instead of silently showing "no archive found"
+      setDriveSearchError(err instanceof Error ? err.message : String(err))
       setHasCheckedFiles(true)
     }
   }, [googleAccessToken, hasCheckedFiles, fetchDriveFiles])
+
+  // Manual retry: clear the checked flag + error and search again
+  const retryDriveSearch = useCallback(async () => {
+    setDriveSearchError(null)
+    setDriveLoading(true)
+    try {
+      const files = await fetchDriveFiles()
+      setDriveFiles(files)
+      setHasCheckedFiles(true)
+    } catch (err) {
+      console.error('Error searching Drive files:', err)
+      setDriveSearchError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setDriveLoading(false)
+    }
+  }, [fetchDriveFiles])
 
   // Check for files when user logs in
   useEffect(() => {
@@ -667,11 +691,28 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
                     )}
                  </div>
               ) : driveFiles.length === 0 ? (
-                 // No files found - show only upload
+                 // No files found (or the search failed) - show upload, and surface search errors
                  <div className="space-y-3">
-                    <p className="text-mastodon-text-secondary text-center text-xs mb-1">
-                       {t('upload.no_archive_in_drive')}
-                    </p>
+                    {driveSearchError ? (
+                       <div className="space-y-2">
+                          <p className="text-mastodon-error text-center text-xs font-medium">
+                             {t('upload.drive_search_failed')}
+                          </p>
+                          <div className="text-[11px] text-mastodon-text-secondary whitespace-pre-line break-words bg-white/[0.03] border border-white/[0.06] rounded-lg p-2.5">
+                             {driveSearchError}
+                          </div>
+                          <button
+                             onClick={retryDriveSearch}
+                             className="w-full py-2 border border-white/10 hover:border-[#34a853]/50 text-[#34a853] rounded-xl transition-all text-xs font-medium cursor-pointer"
+                          >
+                             {t('upload.retry')}
+                          </button>
+                       </div>
+                    ) : (
+                       <p className="text-mastodon-text-secondary text-center text-xs mb-1">
+                          {t('upload.no_archive_in_drive')}
+                       </p>
+                    )}
                     <label className="w-full py-3 bg-[#34a853] hover:bg-[#34a853]/90 text-white rounded-xl transition-colors flex items-center justify-center gap-2.5 font-semibold text-sm cursor-pointer">
                        <Upload className="w-4 h-4" />
                        <span>{t('upload.upload_new')}</span>

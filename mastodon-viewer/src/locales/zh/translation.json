@@ -139,7 +139,8 @@
     "error_detail": "错误详情",
     "error_at_stage": "在「{{stage}}」阶段出错",
     "copy_error": "复制错误信息",
-    "error_copied": "已复制！"
+    "error_copied": "已复制！",
+    "drive_search_failed": "无法读取 Drive 中的存档列表"
   },
   "import_strategy": {
     "title": "账户已存在",
