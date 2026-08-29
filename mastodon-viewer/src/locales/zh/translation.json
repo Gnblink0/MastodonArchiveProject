@@ -135,7 +135,11 @@
     "permission_error": "文件读取权限错误。可能的解决方法：\n1. 关闭可能占用文件的程序（如解压软件、杀毒软件）\n2. 将文件复制到其他位置后重试\n3. 检查文件是否损坏\n4. 尝试使用不同的浏览器",
     "uploading": "上传中...",
     "download_all": "下载全部 {{count}} 个存档",
-    "restoring_progress": "正在恢复 {{current}}/{{total}}..."
+    "restoring_progress": "正在恢复 {{current}}/{{total}}...",
+    "error_detail": "错误详情",
+    "error_at_stage": "在「{{stage}}」阶段出错",
+    "copy_error": "复制错误信息",
+    "error_copied": "已复制！"
   },
   "import_strategy": {
     "title": "账户已存在",

@@ -135,7 +135,11 @@
     "permission_error": "File read permission error. Possible solutions:\n1. Close programs using the file (e.g. decompression software, antivirus)\n2. Copy the file to another location and try again\n3. Check if the file is corrupted\n4. Try using a different browser",
     "uploading": "Uploading...",
     "download_all": "Download All ({{count}})",
-    "restoring_progress": "Restoring {{current}}/{{total}}..."
+    "restoring_progress": "Restoring {{current}}/{{total}}...",
+    "error_detail": "Error detail",
+    "error_at_stage": "Failed at stage: {{stage}}",
+    "copy_error": "Copy error",
+    "error_copied": "Copied!"
   },
   "import_strategy": {
     "title": "Account Already Exists",

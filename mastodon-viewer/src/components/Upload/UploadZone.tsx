@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react'
+import { useCallback, useState, useEffect, useRef } from 'react'
 import { Upload, FileArchive, Loader2, Cloud, ArrowRight, Eye, X, ChevronRight, Download } from 'lucide-react'
 import step1Img from '../../assets/step1.png'
 import step2Img from '../../assets/step2.png'
@@ -29,6 +29,26 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
   const [hasCheckedFiles, setHasCheckedFiles] = useState(false)
   const [showSlowDownloadTip, setShowSlowDownloadTip] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
+  const [errorCopied, setErrorCopied] = useState(false)
+
+  // Track the latest parse stage so error messages can say where it failed
+  // (avoids reading the stale `progress` state inside catch closures)
+  const parseStageRef = useRef<string | null>(null)
+  const trackProgress = useCallback((p: ParseProgress) => {
+    parseStageRef.current = p.stage
+    setProgress(p)
+  }, [])
+
+  // Build a user-facing error string that always keeps the real technical detail
+  const buildErrorMessage = (err: unknown, friendlyHint?: string) => {
+    const rawMessage = err instanceof Error ? err.message : String(err)
+    const stage = parseStageRef.current
+    const parts: string[] = []
+    if (friendlyHint) parts.push(friendlyHint)
+    if (stage) parts.push(t('upload.error_at_stage', { stage }))
+    parts.push(`${t('upload.error_detail')}: ${rawMessage}`)
+    return parts.join('\n\n')
+  }
 
   // Import strategy dialog state
   const [showStrategyDialog, setShowStrategyDialog] = useState(false)
@@ -233,7 +253,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
       await handleFile(file)
     } catch (err) {
       console.error('Drive Import Error:', err)
-      setError(err instanceof Error ? err.message : 'Unknown Drive error')
+      setError(buildErrorMessage(err))
     } finally {
       setDriveLoading(false)
       setDriveStatus('')
@@ -273,7 +293,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
       }
     } catch (err) {
       console.error('Drive Import Error:', err)
-      setError(err instanceof Error ? err.message : 'Unknown Drive error')
+      setError(buildErrorMessage(err))
     } finally {
       setDriveLoading(false)
       setDriveStatus('')
@@ -329,27 +349,26 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
     setUploading(true)
     setError(null)
     setProgress(null)
+    parseStageRef.current = null
 
     try {
-      const parser = new ArchiveParser(setProgress, handleAccountConflict)
+      const parser = new ArchiveParser(trackProgress, handleAccountConflict)
       await parser.parseArchive(file)
 
       // 解析完成
       onUploadComplete()
     } catch (err) {
       console.error('解析失败:', err)
-      const errorMessage = err instanceof Error ? err.message : t('upload.parse_failed')
+      const rawMessage = err instanceof Error ? err.message : String(err)
 
-      // 检查是否是文件读取权限错误
-      if (errorMessage.includes('permission') || errorMessage.includes('could not be read')) {
-        setError(t('upload.permission_error'))
-      } else {
-        setError(errorMessage)
-      }
+      // 文件读取权限错误：给出友好提示，但仍附上真实报错
+      const isPermissionError =
+        rawMessage.includes('permission') || rawMessage.includes('could not be read')
+      setError(buildErrorMessage(err, isPermissionError ? t('upload.permission_error') : undefined))
     } finally {
       setUploading(false)
     }
-  }, [onUploadComplete, handleAccountConflict, t])
+  }, [onUploadComplete, handleAccountConflict, t, trackProgress])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -448,11 +467,12 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
     setDriveLoading(true)
     setError(null)
     setUploadProgress(-1)
+    parseStageRef.current = null
 
     try {
       // 1. Parse + import locally to obtain the accountId
       setDriveStatus(t('upload.processing'))
-      const parser = new ArchiveParser(setProgress, handleAccountConflict)
+      const parser = new ArchiveParser(trackProgress, handleAccountConflict)
       const metadata = await parser.parseArchive(file)
       onUploadComplete()
 
@@ -467,7 +487,7 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
       setHasCheckedFiles(true)
     } catch (err) {
       console.error('Drive Upload Error:', err)
-      setError(err instanceof Error ? err.message : t('upload.upload_failed'))
+      setError(buildErrorMessage(err))
     } finally {
       setDriveLoading(false)
       setDriveStatus('')
@@ -529,16 +549,32 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
               <p className="text-xl font-semibold text-mastodon-error mb-2">
                 {t('upload.upload_failed')}
               </p>
-              <div className="text-sm text-mastodon-text-secondary mt-3 max-w-md mx-auto whitespace-pre-line text-left">
+              <div className="text-sm text-mastodon-text-secondary mt-3 max-w-md mx-auto whitespace-pre-line text-left break-words bg-white/[0.03] border border-white/[0.06] rounded-lg p-3">
                 {error}
               </div>
             </div>
-            <button
-              onClick={() => setError(null)}
-              className="px-8 py-4 bg-mastodon-primary text-white rounded-lg hover:bg-mastodon-primary-hover transition-colors font-medium text-base cursor-pointer"
-            >
-              {t('upload.retry')}
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-center">
+              <button
+                onClick={() => { setError(null); setErrorCopied(false) }}
+                className="px-8 py-4 bg-mastodon-primary text-white rounded-lg hover:bg-mastodon-primary-hover transition-colors font-medium text-base cursor-pointer"
+              >
+                {t('upload.retry')}
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(error)
+                    setErrorCopied(true)
+                    setTimeout(() => setErrorCopied(false), 2000)
+                  } catch {
+                    // clipboard may be unavailable; ignore
+                  }
+                }}
+                className="px-8 py-4 border border-white/10 text-mastodon-text-secondary rounded-lg hover:border-mastodon-primary hover:text-mastodon-primary transition-all font-medium text-base cursor-pointer"
+              >
+                {errorCopied ? t('upload.error_copied') : t('upload.copy_error')}
+              </button>
+            </div>
           </div>
         )
     }
