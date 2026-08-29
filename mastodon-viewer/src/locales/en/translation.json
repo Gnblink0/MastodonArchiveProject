@@ -140,7 +140,9 @@
     "error_at_stage": "Failed at stage: {{stage}}",
     "copy_error": "Copy error",
     "error_copied": "Copied!",
-    "drive_search_failed": "Could not read the archive list from Drive"
+    "drive_search_failed": "Could not read the archive list from Drive",
+    "drive_scope_error": "Google authorization is missing Drive permission. Please re-authorize.",
+    "reauthorize_drive": "Re-authorize Google Drive"
   },
   "import_strategy": {
     "title": "Account Already Exists",

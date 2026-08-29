@@ -82,20 +82,23 @@ function App() {
         setGoogleAccessToken(savedToken)
         setGoogleUser(JSON.parse(savedUser))
 
-        // Verify token is still valid by making a test request
-        fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${savedToken}` },
-        })
-          .then(res => {
-            if (!res.ok) {
-              // Token is invalid, clear everything
-              console.log('Stored token is invalid, clearing...')
+        // Verify token is still valid AND has the Drive scope. Older tokens
+        // (from before Drive support) pass userinfo checks but lack drive.file,
+        // which later causes 403 "insufficient scopes" on Drive API calls.
+        fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${savedToken}`)
+          .then(res => (res.ok ? res.json() : Promise.reject(new Error('invalid'))))
+          .then((info: { scope?: string }) => {
+            const scopes = info.scope || ''
+            if (!scopes.includes('drive.file')) {
+              // Token lacks Drive permission — force a fresh login
+              console.log('Stored token is missing Drive scope, clearing...')
               clearGoogleAuth()
             }
           })
           .catch(() => {
-            // Network error, keep the token for now
-            console.log('Failed to verify token, but keeping it')
+            // Token invalid/expired at Google — clear it
+            console.log('Stored token is invalid, clearing...')
+            clearGoogleAuth()
           })
       } else {
         // Token expired, clear storage
@@ -131,7 +134,10 @@ function App() {
       }
     },
     onError: error => console.error('Google Login Failed:', error),
-    scope: 'https://www.googleapis.com/auth/drive.file'
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    // Force the consent screen so the Drive permission is explicitly granted
+    // (avoids tokens that silently lack drive.file -> 403 insufficient scopes)
+    prompt: 'consent'
   });
 
   const handleLogout = () => {

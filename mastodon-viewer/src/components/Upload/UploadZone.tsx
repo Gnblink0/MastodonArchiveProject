@@ -696,17 +696,28 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
                     {driveSearchError ? (
                        <div className="space-y-2">
                           <p className="text-mastodon-error text-center text-xs font-medium">
-                             {t('upload.drive_search_failed')}
+                             {/scope|permission|insufficient|403/i.test(driveSearchError)
+                                ? t('upload.drive_scope_error')
+                                : t('upload.drive_search_failed')}
                           </p>
                           <div className="text-[11px] text-mastodon-text-secondary whitespace-pre-line break-words bg-white/[0.03] border border-white/[0.06] rounded-lg p-2.5">
                              {driveSearchError}
                           </div>
-                          <button
-                             onClick={retryDriveSearch}
-                             className="w-full py-2 border border-white/10 hover:border-[#34a853]/50 text-[#34a853] rounded-xl transition-all text-xs font-medium cursor-pointer"
-                          >
-                             {t('upload.retry')}
-                          </button>
+                          {/scope|permission|insufficient|403/i.test(driveSearchError) ? (
+                             <button
+                                onClick={() => { setDriveSearchError(null); googleLogin?.() }}
+                                className="w-full py-2 bg-[#34a853] hover:bg-[#34a853]/90 text-white rounded-xl transition-all text-xs font-semibold cursor-pointer"
+                             >
+                                {t('upload.reauthorize_drive')}
+                             </button>
+                          ) : (
+                             <button
+                                onClick={retryDriveSearch}
+                                className="w-full py-2 border border-white/10 hover:border-[#34a853]/50 text-[#34a853] rounded-xl transition-all text-xs font-medium cursor-pointer"
+                             >
+                                {t('upload.retry')}
+                             </button>
+                          )}
                        </div>
                     ) : (
                        <p className="text-mastodon-text-secondary text-center text-xs mb-1">

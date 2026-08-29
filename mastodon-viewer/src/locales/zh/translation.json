@@ -140,7 +140,9 @@
     "error_at_stage": "在「{{stage}}」阶段出错",
     "copy_error": "复制错误信息",
     "error_copied": "已复制！",
-    "drive_search_failed": "无法读取 Drive 中的存档列表"
+    "drive_search_failed": "无法读取 Drive 中的存档列表",
+    "drive_scope_error": "Google 授权缺少 Drive 权限，请重新授权",
+    "reauthorize_drive": "重新授权 Google Drive"
   },
   "import_strategy": {
     "title": "账户已存在",
