@@ -420,14 +420,17 @@ export class ArchiveParser {
                        .map(t => t.name?.replace('#', '') || '') || [],
           emojis, // <--- ✨ 把提取到的表情包放进这里！
           mentions,
-          mediaIds: obj.attachment?.map(a => {
-            // Simple helper to get filename from URL
-            const getFilename = (url: string) => {
-               const clean = url.split('?')[0]
-               return clean.split('/').pop() || ''
-            }
-            return getFilename(a.url)
-          }) || [],
+          mediaIds: (obj.attachment || [])
+            .map((a: any) => {
+              // Some exports include attachments that only have a remote link
+              // (no local `url`), which would otherwise crash on .split().
+              // Guard against missing / non-string urls and skip them.
+              const rawUrl = typeof a?.url === 'string' ? a.url : ''
+              if (!rawUrl) return ''
+              const clean = rawUrl.split('?')[0]
+              return clean.split('/').pop() || ''
+            })
+            .filter(Boolean),
           inReplyTo: inReplyToId,
           sensitive: obj.sensitive || false,
           visibility,
