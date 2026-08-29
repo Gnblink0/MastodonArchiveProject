@@ -132,7 +132,10 @@
     "empty_file": "File is empty, please select a valid archive file",
     "cannot_read": "Cannot read file. Please ensure:\n1. The file is not being used by another program\n2. The file has not been moved or deleted\n3. The browser has permission to access the file\n\nPlease close other programs that might be using the file and try again.",
     "parse_failed": "Archive parsing failed, please check the file format",
-    "permission_error": "File read permission error. Possible solutions:\n1. Close programs using the file (e.g. decompression software, antivirus)\n2. Copy the file to another location and try again\n3. Check if the file is corrupted\n4. Try using a different browser"
+    "permission_error": "File read permission error. Possible solutions:\n1. Close programs using the file (e.g. decompression software, antivirus)\n2. Copy the file to another location and try again\n3. Check if the file is corrupted\n4. Try using a different browser",
+    "uploading": "Uploading...",
+    "download_all": "Download All ({{count}})",
+    "restoring_progress": "Restoring {{current}}/{{total}}..."
   },
   "import_strategy": {
     "title": "Account Already Exists",
@@ -181,10 +184,26 @@
     "reverse": "Newest (Reverse)"
   },
   "months": {
-    "jan": "Jan", "feb": "Feb", "mar": "Mar", "apr": "Apr", "may": "May", "jun": "Jun",
-    "jul": "Jul", "aug": "Aug", "sep": "Sep", "oct": "Oct", "nov": "Nov", "dec": "Dec"
+    "jan": "Jan",
+    "feb": "Feb",
+    "mar": "Mar",
+    "apr": "Apr",
+    "may": "May",
+    "jun": "Jun",
+    "jul": "Jul",
+    "aug": "Aug",
+    "sep": "Sep",
+    "oct": "Oct",
+    "nov": "Nov",
+    "dec": "Dec"
   },
   "weekdays": {
-    "su": "Su", "mo": "Mo", "tu": "Tu", "we": "We", "th": "Th", "fr": "Fr", "sa": "Sa"
+    "su": "Su",
+    "mo": "Mo",
+    "tu": "Tu",
+    "we": "We",
+    "th": "Th",
+    "fr": "Fr",
+    "sa": "Sa"
   }
 }

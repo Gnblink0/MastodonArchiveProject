@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect } from 'react'
-import { Upload, FileArchive, Loader2, Cloud, ArrowRight, Eye, X, ChevronRight } from 'lucide-react'
+import { Upload, FileArchive, Loader2, Cloud, ArrowRight, Eye, X, ChevronRight, Download } from 'lucide-react'
 import step1Img from '../../assets/step1.png'
 import step2Img from '../../assets/step2.png'
 import { ArchiveParser } from '../../lib/parser'
@@ -35,40 +35,48 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
   const [currentConflict, setCurrentConflict] = useState<AccountConflict | null>(null)
   const [strategyResolver, setStrategyResolver] = useState<((strategy: ImportStrategy) => void) | null>(null)
 
-  // Search for existing files in Drive
+  // Core fetch: return all archive files in Drive (newest first)
+  const fetchDriveFiles = useCallback(async (): Promise<any[]> => {
+    if (!googleAccessToken) return []
+
+    const query = "name contains 'archive' and trashed = false"
+    const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,size,createdTime,mimeType)`
+
+    const searchRes = await fetch(searchUrl, {
+      headers: { Authorization: `Bearer ${googleAccessToken}` }
+    })
+
+    if (!searchRes.ok) throw new Error('Failed to search Drive')
+
+    const data = await searchRes.json()
+    let files = data.files || []
+
+    // Filter for archive extensions
+    files = files.filter((f: any) =>
+       f.name.endsWith('.tar.gz') ||
+       f.name.endsWith('.tgz') ||
+       f.name.endsWith('.zip')
+    )
+
+    // Sort by createdTime desc (newest first)
+    files.sort((a: any, b: any) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime())
+
+    return files
+  }, [googleAccessToken])
+
+  // Search for existing files in Drive (initial check, gated by hasCheckedFiles)
   const searchDriveFiles = useCallback(async () => {
     if (!googleAccessToken || hasCheckedFiles) return
 
     try {
-      const query = "name contains 'archive' and trashed = false"
-      const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,size,createdTime,mimeType)`
-
-      const searchRes = await fetch(searchUrl, {
-        headers: { Authorization: `Bearer ${googleAccessToken}` }
-      })
-
-      if (!searchRes.ok) return
-
-      const data = await searchRes.json()
-      let files = data.files || []
-
-      // Filter for archive extensions
-      files = files.filter((f: any) =>
-         f.name.endsWith('.tar.gz') ||
-         f.name.endsWith('.tgz') ||
-         f.name.endsWith('.zip')
-      )
-
-      // Sort by createdTime desc (newest first)
-      files.sort((a: any, b: any) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime())
-
+      const files = await fetchDriveFiles()
       setDriveFiles(files)
       setHasCheckedFiles(true)
     } catch (err) {
       console.error('Error searching Drive files:', err)
       setHasCheckedFiles(true)
     }
-  }, [googleAccessToken, hasCheckedFiles])
+  }, [googleAccessToken, hasCheckedFiles, fetchDriveFiles])
 
   // Check for files when user logs in
   useEffect(() => {
@@ -77,57 +85,13 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
     }
   }, [googleAccessToken, mode, hasCheckedFiles, searchDriveFiles])
 
-  const handleDriveImport = async () => {
-    if (!googleAccessToken) {
-      googleLogin?.()
-      return
-    }
+  // Download a single Drive file (streaming, with progress) and return it as a File
+  const downloadDriveFileAsFile = async (driveFile: any): Promise<File> => {
+      const totalBytes = parseInt(driveFile.size, 10) || 0
+      setDriveStatus(`${t('upload.processing')} ${driveFile.name}...`)
 
-    setDriveLoading(true)
-    setDriveStatus(t('upload.downloading_from_drive'))
-    setUploadProgress(-1)
-    setError(null)
-    setShowSlowDownloadTip(false)
-
-    try {
-      // Use cached files if available, otherwise search
-      let files = driveFiles
-
-      if (files.length === 0) {
-        setDriveStatus(t('upload.searching_archives'))
-        const query = "name contains 'archive' and trashed = false"
-        const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,size,createdTime,mimeType)`
-
-        const searchRes = await fetch(searchUrl, {
-          headers: { Authorization: `Bearer ${googleAccessToken}` }
-        })
-
-        if (!searchRes.ok) throw new Error('Failed to search Drive')
-
-        const data = await searchRes.json()
-        files = data.files || []
-
-        // Filter in client-side for extensions
-        files = files.filter((f: any) =>
-           f.name.endsWith('.tar.gz') ||
-           f.name.endsWith('.tgz') ||
-           f.name.endsWith('.zip')
-        )
-
-        if (files.length === 0) {
-          throw new Error(t('upload.no_archive_in_drive'))
-        }
-
-        // Sort by createdTime desc (newest first)
-        files.sort((a: any, b: any) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime())
-      }
-
-      const latestFile = files[0]
-      const totalBytes = parseInt(latestFile.size, 10) || 0
-      setDriveStatus(`${t('upload.processing')} ${latestFile.name}...`)
-
-      // 2. Download the file using Fetch API with streaming for better mobile compatibility
-      const downloadUrl = `https://www.googleapis.com/drive/v3/files/${latestFile.id}?alt=media`
+      // Download the file using Fetch API with streaming for better mobile compatibility
+      const downloadUrl = `https://www.googleapis.com/drive/v3/files/${driveFile.id}?alt=media`
 
       setUploadProgress(0) // Start progress bar at 0%
 
@@ -245,13 +209,68 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
       })
 
       // Convert to File object
-      const file = new File([blob], latestFile.name, { type: 'application/gzip' })
+      return new File([blob], driveFile.name, { type: 'application/gzip' })
+  }
 
-      // 3. Parse
+  // Download a single Drive file and import it (used by per-file download buttons)
+  const processDriveFile = async (driveFile: any) => {
+    if (!googleAccessToken) {
+      googleLogin?.()
+      return
+    }
+
+    setDriveLoading(true)
+    setDriveStatus(t('upload.downloading_from_drive'))
+    setUploadProgress(-1)
+    setError(null)
+    setShowSlowDownloadTip(false)
+
+    try {
+      const file = await downloadDriveFileAsFile(driveFile)
+
       setDriveStatus(t('upload.processing'))
       setUploadProgress(-1) // Hide progress bar
       await handleFile(file)
+    } catch (err) {
+      console.error('Drive Import Error:', err)
+      setError(err instanceof Error ? err.message : 'Unknown Drive error')
+    } finally {
+      setDriveLoading(false)
+      setDriveStatus('')
+      setUploadProgress(-1)
+    }
+  }
 
+  // Download all archives in Drive and import them sequentially
+  const handleDownloadAll = async () => {
+    if (!googleAccessToken) {
+      googleLogin?.()
+      return
+    }
+
+    let files = driveFiles
+    setDriveLoading(true)
+    setDriveStatus(t('upload.downloading_from_drive'))
+    setUploadProgress(-1)
+    setError(null)
+    setShowSlowDownloadTip(false)
+
+    try {
+      if (files.length === 0) {
+        setDriveStatus(t('upload.searching_archives'))
+        files = await fetchDriveFiles()
+        setDriveFiles(files)
+      }
+
+      if (files.length === 0) {
+        throw new Error(t('upload.no_archive_in_drive'))
+      }
+
+      for (let i = 0; i < files.length; i++) {
+        setDriveStatus(t('upload.restoring_progress', { current: i + 1, total: files.length }))
+        const file = await downloadDriveFileAsFile(files[i])
+        await handleFile(file)
+      }
     } catch (err) {
       console.error('Drive Import Error:', err)
       setError(err instanceof Error ? err.message : 'Unknown Drive error')
@@ -346,6 +365,115 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
     const file = e.target.files?.[0]
     if (file) handleFile(file)
   }, [handleFile])
+
+  // Build a stable, filesystem-safe Drive file name per account, so each account
+  // keeps a single file in Drive that gets overwritten on re-upload.
+  const getArchiveExt = (name: string) => {
+    const n = name.toLowerCase()
+    if (n.endsWith('.tar.gz')) return '.tar.gz'
+    if (n.endsWith('.tgz')) return '.tgz'
+    return '.zip'
+  }
+
+  const buildDriveName = (accountId: string, originalName: string) => {
+    const safeId = accountId
+      .replace(/^https?:\/\//, '')
+      .replace(/[^a-zA-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+    return `archive-${safeId}${getArchiveExt(originalName)}`
+  }
+
+  // Upload a file to Drive using a per-account stable name: overwrite the existing
+  // file's content if one already exists, otherwise create a new file.
+  const uploadFileToDrive = async (file: File, accountId: string) => {
+    if (!googleAccessToken) throw new Error('Not authenticated')
+
+    const driveName = buildDriveName(accountId, file.name)
+
+    // Look for an existing file with the same stable name
+    const files = await fetchDriveFiles()
+    const existing = files.find((f: any) => f.name === driveName)
+
+    const onProgress = (event: ProgressEvent) => {
+      if (event.lengthComputable) {
+        const percentComplete = (event.loaded / event.total) * 100
+        setUploadProgress(percentComplete)
+        setDriveStatus(`${t('upload.uploading')} ${Math.round(percentComplete)}%`)
+      }
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+
+      if (existing) {
+        // Update the content of the existing file (keeps same id/name)
+        xhr.open('PATCH', `https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=media`)
+        xhr.setRequestHeader('Authorization', `Bearer ${googleAccessToken}`)
+        xhr.setRequestHeader('Content-Type', file.type || 'application/gzip')
+        xhr.upload.onprogress = onProgress
+        xhr.onload = () => (xhr.status === 200 ? resolve() : reject(new Error('Update failed')))
+        xhr.onerror = () => reject(new Error('Update failed'))
+        xhr.send(file)
+      } else {
+        // Create a new file
+        const metadata = { name: driveName, mimeType: file.type || 'application/x-gzip' }
+        const form = new FormData()
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
+        form.append('file', file)
+        xhr.open('POST', 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart')
+        xhr.setRequestHeader('Authorization', `Bearer ${googleAccessToken}`)
+        xhr.upload.onprogress = onProgress
+        xhr.onload = () => (xhr.status === 200 ? resolve() : reject(new Error('Upload failed')))
+        xhr.onerror = () => reject(new Error('Upload failed'))
+        xhr.send(form)
+      }
+    })
+  }
+
+  // Parse+import a picked file locally, then upload it to Drive under a per-account
+  // stable name (overwriting the previous version for that account).
+  const handleDriveUpload = async (file: File) => {
+    if (!googleAccessToken) {
+      googleLogin?.()
+      return
+    }
+
+    const fileName = file.name.toLowerCase()
+    const isValidFormat = fileName.endsWith('.zip') || fileName.endsWith('.tar.gz') || fileName.endsWith('.tgz')
+    if (!isValidFormat) {
+      setError(t('upload.invalid_format'))
+      return
+    }
+
+    setDriveLoading(true)
+    setError(null)
+    setUploadProgress(-1)
+
+    try {
+      // 1. Parse + import locally to obtain the accountId
+      setDriveStatus(t('upload.processing'))
+      const parser = new ArchiveParser(setProgress, handleAccountConflict)
+      const metadata = await parser.parseArchive(file)
+      onUploadComplete()
+
+      // 2. Upload to Drive under a stable per-account name (overwrite if exists)
+      setUploadProgress(0)
+      setDriveStatus(t('upload.uploading'))
+      await uploadFileToDrive(file, metadata.accountId)
+
+      // 3. Refresh the Drive file list
+      const refreshed = await fetchDriveFiles()
+      setDriveFiles(refreshed)
+      setHasCheckedFiles(true)
+    } catch (err) {
+      console.error('Drive Upload Error:', err)
+      setError(err instanceof Error ? err.message : t('upload.upload_failed'))
+    } finally {
+      setDriveLoading(false)
+      setDriveStatus('')
+      setUploadProgress(-1)
+    }
+  }
 
   const handleLoadSample = useCallback(async () => {
     setLoadingSample(true)
@@ -517,60 +645,8 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
                           className="hidden"
                           onChange={(e) => {
                              const file = e.target.files?.[0]
-                             if (!file) return
-
-                             setDriveLoading(true)
-                             setDriveStatus('Starting upload...')
-                             setUploadProgress(0)
-
-                             const metadata = {
-                                name: file.name,
-                                mimeType: file.type || 'application/x-gzip'
-                             }
-
-                             const form = new FormData()
-                             form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
-                             form.append('file', file)
-
-                             const xhr = new XMLHttpRequest()
-                             xhr.open('POST', 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart')
-                             xhr.setRequestHeader('Authorization', `Bearer ${googleAccessToken}`)
-
-                             xhr.upload.onprogress = (event) => {
-                                if (event.lengthComputable) {
-                                   const percentComplete = (event.loaded / event.total) * 100
-                                   setUploadProgress(percentComplete)
-                                   setDriveStatus(`Uploading... ${Math.round(percentComplete)}%`)
-                                }
-                             }
-
-                             xhr.onload = async () => {
-                                if (xhr.status === 200) {
-                                   setDriveStatus('Upload complete! Processing...')
-                                   setUploadProgress(-1)
-                                   try {
-                                      // Refresh file list
-                                      setHasCheckedFiles(false)
-                                      await handleFile(file)
-                                   } catch (err) {
-                                      console.error(err)
-                                      setError('Failed to process file')
-                                   }
-                                } else {
-                                   setError('Upload failed')
-                                   console.error('Upload failed:', xhr.response)
-                                }
-                                setDriveLoading(false)
-                                setUploadProgress(-1)
-                             }
-
-                             xhr.onerror = () => {
-                                setError('Upload failed')
-                                setDriveLoading(false)
-                                setUploadProgress(-1)
-                             }
-
-                             xhr.send(form)
+                             if (file) handleDriveUpload(file)
+                             e.target.value = ''
                           }}
                        />
                     </label>
@@ -584,20 +660,8 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
                     )}
                  </div>
               ) : (
-                 // Files found - show file info and both upload/download options
+                 // Files found - show upload, download all, and a per-archive list
                  <div className="space-y-3">
-                    <div className="border border-white/[0.08] rounded-xl p-3 bg-white/[0.02]">
-                       <p className="text-[10px] text-mastodon-text-secondary mb-0.5">{t('upload.archive_in_drive')}</p>
-                       <p className="text-xs text-white font-medium truncate">{driveFiles[0].name}</p>
-                       {driveFiles.length > 1 && (
-                          <p className="text-[10px] text-mastodon-text-secondary mt-0.5">
-                             {driveFiles.length > 2
-                                ? t('upload.more_archives_plural', { count: driveFiles.length - 1 })
-                                : t('upload.more_archives', { count: driveFiles.length - 1 })}
-                          </p>
-                       )}
-                    </div>
-
                     <label className="w-full py-3 bg-[#34a853] hover:bg-[#34a853]/90 text-white rounded-xl transition-colors flex items-center justify-center gap-2.5 font-semibold text-sm cursor-pointer">
                        <Upload className="w-4 h-4" />
                        <span>{t('upload.upload_new')}</span>
@@ -607,71 +671,44 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
                           className="hidden"
                           onChange={(e) => {
                              const file = e.target.files?.[0]
-                             if (!file) return
-
-                             setDriveLoading(true)
-                             setDriveStatus('Starting upload...')
-                             setUploadProgress(0)
-
-                             const metadata = {
-                                name: file.name,
-                                mimeType: file.type || 'application/x-gzip'
-                             }
-
-                             const form = new FormData()
-                             form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
-                             form.append('file', file)
-
-                             const xhr = new XMLHttpRequest()
-                             xhr.open('POST', 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart')
-                             xhr.setRequestHeader('Authorization', `Bearer ${googleAccessToken}`)
-
-                             xhr.upload.onprogress = (event) => {
-                                if (event.lengthComputable) {
-                                   const percentComplete = (event.loaded / event.total) * 100
-                                   setUploadProgress(percentComplete)
-                                   setDriveStatus(`Uploading... ${Math.round(percentComplete)}%`)
-                                }
-                             }
-
-                             xhr.onload = async () => {
-                                if (xhr.status === 200) {
-                                   setDriveStatus('Upload complete! Processing...')
-                                   setUploadProgress(-1)
-                                   try {
-                                      // Refresh file list
-                                      setHasCheckedFiles(false)
-                                      await handleFile(file)
-                                   } catch (err) {
-                                      console.error(err)
-                                      setError('Failed to process file')
-                                   }
-                                } else {
-                                   setError('Upload failed')
-                                   console.error('Upload failed:', xhr.response)
-                                }
-                                setDriveLoading(false)
-                                setUploadProgress(-1)
-                             }
-
-                             xhr.onerror = () => {
-                                setError('Upload failed')
-                                setDriveLoading(false)
-                                setUploadProgress(-1)
-                             }
-
-                             xhr.send(form)
+                             if (file) handleDriveUpload(file)
+                             e.target.value = ''
                           }}
                        />
                     </label>
 
-                    <button
-                       onClick={handleDriveImport}
-                       className="w-full py-3 border border-white/10 hover:border-[#34a853]/50 text-[#34a853] rounded-xl transition-all flex items-center justify-center gap-2.5 font-medium text-sm cursor-pointer"
-                    >
-                       <ArrowRight className="w-4 h-4" />
-                       <span>{t('upload.download_cloud')}</span>
-                    </button>
+                    {driveFiles.length > 1 && (
+                       <button
+                          onClick={handleDownloadAll}
+                          className="w-full py-3 bg-[#34a853]/10 hover:bg-[#34a853]/20 text-[#34a853] rounded-xl transition-all flex items-center justify-center gap-2.5 font-semibold text-sm cursor-pointer"
+                       >
+                          <Download className="w-4 h-4" />
+                          <span>{t('upload.download_all', { count: driveFiles.length })}</span>
+                       </button>
+                    )}
+
+                    <div className="border border-white/[0.08] rounded-xl divide-y divide-white/[0.06] overflow-hidden bg-white/[0.02]">
+                       {driveFiles.map((f: any) => (
+                          <div key={f.id} className="flex items-center gap-2 p-2.5">
+                             <FileArchive className="w-4 h-4 text-mastodon-text-secondary shrink-0" />
+                             <div className="min-w-0 flex-1">
+                                <p className="text-xs text-white font-medium truncate">{f.name}</p>
+                                {f.size && (
+                                   <p className="text-[10px] text-mastodon-text-secondary">
+                                      {(parseInt(f.size, 10) / 1024 / 1024).toFixed(1)} MB
+                                   </p>
+                                )}
+                             </div>
+                             <button
+                                onClick={() => processDriveFile(f)}
+                                title={t('upload.download_cloud')}
+                                className="shrink-0 p-1.5 rounded-lg text-[#34a853] hover:bg-[#34a853]/10 transition-colors cursor-pointer"
+                             >
+                                <ArrowRight className="w-4 h-4" />
+                             </button>
+                          </div>
+                       ))}
+                    </div>
 
                     {googleUser && (
                         <div className="text-center pt-2">
