@@ -377,14 +377,17 @@ function App() {
 
       {/* Mobile Menu Drawer */}
       <div className={`fixed top-0 left-0 h-[100dvh] w-[280px] bg-mastodon-bg z-50 transform transition-transform duration-300 md:hidden flex flex-col ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex justify-end p-4">
-          <button onClick={() => setMobileMenuOpen(false)} className="text-white">
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-        
+        {/* Floating close button - no dedicated bar, so content starts at the top */}
+        <button
+          onClick={() => setMobileMenuOpen(false)}
+          aria-label="Close menu"
+          className="absolute top-3 right-3 z-10 text-mastodon-text-secondary hover:text-white transition-colors cursor-pointer p-1"
+        >
+          <X className="w-6 h-6" />
+        </button>
+
         {/* Render content with scrolling */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pt-3 pb-safe">
            {leftSidebarContent}
         </div>
       </div>
