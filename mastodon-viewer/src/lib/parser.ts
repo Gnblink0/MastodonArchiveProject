@@ -147,16 +147,37 @@ export class ArchiveParser {
     }
   }
 
+  // Some archives (e.g. a folder re-zipped by the user, or macOS "Compress")
+  // wrap all files inside a top-level directory like `archive-xxx/`. Detect that
+  // wrapper by anchoring on a known marker file and return the prefix to strip,
+  // so lookups like `outbox.json` / `^media_attachments/` still work.
+  private computeRootPrefix(names: string[]): string {
+    const markers = ['actor.json', 'outbox.json']
+    for (const marker of markers) {
+      // Prefer an exact root match (no wrapper) first
+      if (names.includes(marker)) return ''
+      const hit = names.find(n => n.endsWith('/' + marker))
+      if (hit) return hit.slice(0, hit.length - marker.length)
+    }
+    return ''
+  }
+
   private async loadZip(file: File): Promise<ArchiveContainer> {
     // Use zip.js for better large file support (>2GB)
     const zipFileReader = new BlobReader(file)
     const zipReader = new ZipReader(zipFileReader)
     const entries = await zipReader.getEntries()
 
-    // Create a map for fast lookup
+    // Detect + strip a wrapper folder (e.g. re-zipped `archive-xxx/...`)
+    const prefix = this.computeRootPrefix(entries.map(e => e.filename))
+    const strip = (n: string) => (prefix && n.startsWith(prefix) ? n.slice(prefix.length) : n)
+
+    // Create a map for fast lookup (keyed by normalized path)
     const fileMap = new Map<string, Entry>()
     for (const entry of entries) {
-      fileMap.set(entry.filename, entry)
+      const key = strip(entry.filename)
+      if (!key) continue // skip the wrapper directory entry itself
+      fileMap.set(key, entry)
     }
 
     // Wrapper to convert zip.js Entry to our ArchiveFile interface
@@ -183,7 +204,7 @@ export class ArchiveParser {
       }
 
       return {
-        name: entry.filename,
+        name: strip(entry.filename),
         dir: entry.directory,
         async: asyncMethod
       }
@@ -196,13 +217,13 @@ export class ArchiveParser {
           return entry ? wrapEntry(entry) : null
         } else {
           return entries
-            .filter(e => pathOrRegex.test(e.filename))
+            .filter(e => pathOrRegex.test(strip(e.filename)))
             .map(e => wrapEntry(e))
         }
       },
       forEach(callback: (relativePath: string, file: ArchiveFile) => void): void {
         entries.forEach(entry => {
-          callback(entry.filename, wrapEntry(entry))
+          callback(strip(entry.filename), wrapEntry(entry))
         })
       }
     }
@@ -218,13 +239,19 @@ export class ArchiveParser {
     // Extract tar
     const files = await untar(decompressed.buffer)
 
+    // Detect + strip a wrapper folder (e.g. re-tarred `archive-xxx/...`)
+    const prefix = this.computeRootPrefix(files.map((f: any) => f.name))
+    const strip = (n: string) => (prefix && n.startsWith(prefix) ? n.slice(prefix.length) : n)
+
     // Create a container that mimics JSZip's interface
     const fileMap = new Map<string, any>()
     const fileList: any[] = []
 
     for (const file of files) {
+      const key = strip(file.name)
+      if (!key) continue // skip the wrapper directory entry itself
       const archiveFile = {
-        name: file.name,
+        name: key,
         dir: file.type === '5', // Directory type in tar
         async(type: 'string' | 'blob' | 'arraybuffer'): Promise<any> {
           if (type === 'string') {
@@ -238,7 +265,7 @@ export class ArchiveParser {
         }
       }
 
-      fileMap.set(file.name, archiveFile)
+      fileMap.set(key, archiveFile)
       fileList.push(archiveFile)
     }
 
