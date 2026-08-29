@@ -169,7 +169,11 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
             const total = contentLength ? parseInt(contentLength, 10) : totalBytes
 
             let receivedBytes = 0
-            const chunks: Uint8Array[] = []
+            // Store chunks as Blobs (browser-managed, can spill to disk) instead of
+            // Uint8Array in the JS heap. Accumulating the whole file in the heap +
+            // copying it again into a Blob peaks at ~2x file size and makes mobile
+            // Safari reload the tab on large archives.
+            const chunks: Blob[] = []
             let lastProgressTime = Date.now()
             const startTime = Date.now()
             let lastSpeedUpdateTime = startTime
@@ -203,7 +207,8 @@ export function UploadZone({ onUploadComplete, googleUser, googleLogin, googleAc
 
                if (done) break
 
-               chunks.push(value)
+               // Convert to a Blob immediately so the raw bytes leave the JS heap
+               chunks.push(new Blob([value as BlobPart]))
                receivedBytes += value.length
                lastProgressTime = Date.now()
 
